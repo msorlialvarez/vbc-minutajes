@@ -1,0 +1,1159 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VBC Minutajes</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#f47721">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VBC Minutajes">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --o:#f47721;--o2:#ff9d55;--ink:#171a1e;--ink2:#252a30;--paper:#f3f5f7;
+  --line:#d8dde2;--muted:#707983;--g:#4da66d;--y:#f2c94c;--or:#ed8b2f;--r:#d9534f;--gry:#bbc1c7;--blue:#2e5fa8
+}
+*{box-sizing:border-box}
+body{margin:0;background:#e9edf0;color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+button,input{font:inherit} button{cursor:pointer}
+.app{max-width:1600px;margin:auto;background:#fff;min-height:100vh}
+header{background:linear-gradient(120deg,#12161a,#2b3036);color:#fff;border-bottom:5px solid var(--o);padding:16px 20px}
+.header{display:flex;justify-content:space-between;gap:18px;align-items:center}
+h1{margin:0;font-size:clamp(24px,3vw,42px)} h1 span{color:var(--o2)}
+.sub{color:#d7dbe0;margin-top:4px;font-size:14px}
+.motto{border:1px solid #555e66;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:900}
+main{padding:12px}
+.top{display:grid;grid-template-columns:1fr .75fr .65fr 1.2fr auto;gap:8px;align-items:end;margin-bottom:10px}
+label{display:block;font-size:10px;font-weight:900;color:#59616a;margin-bottom:3px}
+input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padding:7px 9px;background:#fff;color:var(--ink)}
+.btn{border:0;border-radius:8px;padding:9px 12px;min-height:38px;background:#e7eaed;color:#20252a;font-weight:900}
+.btn.primary{background:var(--o);color:#fff}.btn.dark{background:var(--ink2);color:#fff}.btn.red{background:#a84040;color:#fff}.btn.confirming{background:#a84040;color:#fff}
+.box{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fff}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--ink2);color:#fff;padding:8px 10px}
+.head.orange{background:var(--o)} .head h2,.head h3{font-size:14px;margin:0}
+.roster{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:8px}
+.rp{display:grid;grid-template-columns:48px 1fr 56px 64px;gap:5px;align-items:center}
+.rp input{min-width:0;padding:6px}.rp .target{border:2px solid #f3b37d;text-align:center;font-weight:950;background:#fff8f1}
+.tip{background:#fff6ed;border:1px solid #f1c693;border-radius:9px;padding:7px 9px;font-size:11px;color:#6e430e;margin:9px 0}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;align-items:start}
+.qs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.q{border:2px solid #30353b;border-radius:10px;overflow:hidden}
+.qh{background:var(--o);color:#fff;padding:7px 9px;display:flex;justify-content:space-between;align-items:center}
+.qh strong{font-size:18px}.qh span{font-size:10px;font-weight:900}
+.start{display:grid;grid-template-columns:74px repeat(5,1fr);border-bottom:2px solid #333}
+.startlabel{background:#ffe0c7;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:950}
+.pick{border:0;border-left:1px solid #c6cbd0;background:#fff;min-height:38px;font-weight:950;color:var(--blue);padding:3px}
+.pick small{display:block;color:#6f7780;font-size:8px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grid{display:grid;grid-template-columns:46px repeat(5,1fr)}
+.c{min-height:34px;border-right:1px solid #d5d9dd;border-bottom:1px solid #d5d9dd;display:flex;align-items:center;justify-content:center}
+.c.m{background:#f0f2f4;font-weight:950}.c.h{background:#e1e5e8;font-size:10px;font-weight:900;min-height:27px}
+.change{width:100%;height:100%;border:0;background:white;color:var(--blue);font-weight:950;padding:2px}.change:hover,.pick:hover{background:#fff5eb}
+.side{position:sticky;top:8px}
+.sumwrap{padding:7px}
+.ps{border:1px solid #dfe3e7;border-left:6px solid var(--gry);border-radius:8px;padding:6px 7px;margin-bottom:5px}
+.ps.grey{border-left-color:var(--gry)}.ps.green{border-left-color:var(--g)}.ps.yellow{border-left-color:var(--y)}.ps.orange{border-left-color:var(--or)}.ps.red{border-left-color:var(--r)}
+.pst{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+.pn{font-weight:950;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm{font-size:20px;font-weight:950}.meta{font-size:9px;color:var(--muted)}
+.diff{font-size:9px;font-weight:900}.diff.ok{color:#2c7b4e}.diff.more{color:#a45616}.diff.less{color:#8b4260}
+.tl{display:grid;grid-template-columns:repeat(40,1fr);gap:1px;margin-top:4px}.tl span{height:6px;background:#e6e9ec}.tl span.on{background:#34393e}.tl span.sep{margin-right:2px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:7px}.metric{background:#f3f5f7;border-radius:7px;padding:6px;text-align:center}.metric strong{display:block;font-size:16px}.metric span{font-size:8px;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:6px;font-size:9px;color:#666;margin-top:6px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:-1px;margin-right:3px}
+.analysis{display:grid;grid-template-columns:1.15fr .85fr;gap:10px;margin-top:10px}
+.pb{padding:9px}.players{display:flex;gap:6px;flex-wrap:wrap}.pill{border:1px solid #cfd4da;background:#fff;border-radius:999px;padding:7px 9px;font-weight:900;font-size:11px}.pill.sel{background:#252a30;color:#fff;border-color:#252a30}
+.combo{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f4f6f7;border-radius:9px;padding:10px;margin-top:8px}.combo .who{font-weight:900;font-size:12px}.combo .val{font-size:30px;font-weight:950;color:var(--o)}
+.top5{display:grid;gap:5px}.qrow{border:1px solid #dde1e5;border-radius:8px;padding:7px}.qrowtop{display:flex;justify-content:space-between;gap:8px}.nums{font-weight:950;font-size:12px}.mins{font-size:19px;font-weight:950;color:var(--o)}.names,.segments{font-size:9px;color:var(--muted);margin-top:2px}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.modal{position:fixed;inset:0;background:rgba(15,18,20,.58);display:none;align-items:center;justify-content:center;padding:16px;z-index:100}.modal.open{display:flex}
+.modalcard{width:min(640px,100%);background:#fff;border-radius:12px;overflow:hidden}.modalbody{padding:12px}.modalgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.mp{border:1px solid #d4d9de;background:#fff;border-radius:9px;padding:10px 7px;font-weight:900}.mp small{display:block;color:#68717a;font-size:9px}
+.report{display:none;background:#fff}.report.open{display:block}
+.reportbar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:8px 0 12px}
+.report-title{font-size:28px;font-weight:950;margin:0}.report-sub{color:#68717a;font-size:12px}
+.report-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.report-card{border:1px solid #d8dde2;border-radius:10px;overflow:hidden}.report-card h3{margin:0;background:#252a30;color:#fff;padding:8px 10px;font-size:13px}
+.report-body{padding:9px}.rtable{width:100%;border-collapse:collapse}.rtable th,.rtable td{border:1px solid #d8dde2;padding:5px;text-align:center;font-size:10px}.rtable th{background:#f0f2f4}.rtable td.name{text-align:left;font-weight:800}
+.report-combo{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.rcombo{background:#f5f6f7;border-radius:8px;padding:7px;font-size:10px}
+@media(max-width:1300px){.qs{grid-template-columns:1fr}}
+@media(max-width:820px){.layout{grid-template-columns:1fr}.side{position:static}.sumwrap{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}.ps{margin:0}.metrics,.legend{grid-column:1/-1}}
+@media(max-width:850px){.analysis,.report-grid{grid-template-columns:1fr}.roster{grid-template-columns:repeat(3,1fr)}.top{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){main{padding:7px}.roster{grid-template-columns:repeat(2,1fr)}.modalgrid{grid-template-columns:repeat(2,1fr)}}
+@media print{
+ body{background:#fff}.app{max-width:none}.planner-view{display:none!important}.report{display:block!important}
+ header,.reportbar .no-print{display:none!important}.report{padding:0}.report-title{font-size:24px}
+ .report-grid{grid-template-columns:1fr 1fr}.report-card{break-inside:avoid}
+ @page{size:A4 landscape;margin:8mm}
+}
+</style>
+
+<style>
+.squad-cards{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:8px;
+}
+.squad-card{
+  position:relative;
+  border:2px solid #d7dce1;
+  border-radius:12px;
+  background:#f7f8f9;
+  padding:10px;
+  min-width:0;
+  transition:border-color .15s ease,background .15s ease,transform .15s ease;
+}
+.squad-card.active{
+  background:#fff8f2;
+  border-color:var(--o);
+}
+.squad-card.inactive{
+  opacity:.55;
+  background:#f1f2f3;
+}
+.squad-main{
+  display:grid;
+  grid-template-columns:46px minmax(0,1fr);
+  gap:8px;
+  align-items:center;
+  cursor:pointer;
+}
+.squad-number{
+  width:46px;height:46px;border-radius:12px;
+  background:#252a30;color:white;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:950;
+}
+.squad-card.active .squad-number{background:var(--o)}
+.squad-name{
+  font-size:12px;font-weight:950;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.squad-status{
+  margin-top:2px;
+  font-size:9px;font-weight:900;
+  color:#6b737b;
+}
+.squad-bottom{
+  display:grid;
+  grid-template-columns:1fr 68px;
+  gap:7px;
+  align-items:end;
+  margin-top:9px;
+}
+.squad-check{
+  min-height:34px;border:0;border-radius:8px;
+  background:#e4e7ea;color:#4e565e;
+  font-size:10px;font-weight:950;
+}
+.squad-card.active .squad-check{
+  background:#252a30;color:white;
+}
+.squad-min label{
+  font-size:8px;margin-bottom:2px;text-align:center;
+}
+.squad-min input{
+  min-height:34px;
+  text-align:center;
+  font-size:15px;
+  font-weight:950;
+  border:2px solid #f1b27a;
+  background:white;
+}
+.squad-card.inactive .squad-min input{
+  border-color:#d3d7db;
+  background:#eceeef;
+}
+@media(max-width:1200px){.squad-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.squad-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
+<style>
+.live-view{display:none}
+.livebar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:linear-gradient(120deg,#12161a,#2b3036);color:#fff;padding:12px;border-radius:11px 11px 0 0}
+.livetitle{display:flex;align-items:center;gap:8px;font-weight:950;font-size:15px}
+.livedot{width:9px;height:9px;border-radius:50%;background:var(--r);display:inline-block;animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.livemeta{font-size:11px;color:#c9ced3;margin-top:2px}
+.livewrap{border:1px solid var(--line);border-radius:0 0 11px 11px;border-top:0;background:#fff;padding:12px}
+.livewrap .q{margin-bottom:12px}
+.lstart{grid-template-columns:74px repeat(10,1fr)}
+.lgrid{grid-template-columns:46px repeat(10,1fr)}
+.lgrid .c.h.realc{background:#ffe0c7}
+.lgrid .c.h.planc{background:#e1e5e8;color:#6f7780}
+.planc{background:#f7f8f9;color:#7c838b;cursor:default}
+.planc small{color:#9aa1a8}
+.lstart .pick.realc,.lgrid .change.realc{color:var(--r)}
+.lstart .pick.realc:hover,.lgrid .change.realc:hover{background:#fff0ee}
+.lgrid .c.planc,.lstart .pick.planc{border-right:2px solid #30353b}
+.livetable{width:100%;border-collapse:collapse;margin-top:4px}
+.livetable th,.livetable td{border:1px solid var(--line);padding:6px;text-align:center;font-size:10px}
+.livetable th{background:#f0f2f4}
+.livetable td.name{text-align:left;font-weight:800}
+@media(max-width:850px){.livebar{flex-direction:column;align-items:stretch}.lstart{grid-template-columns:56px repeat(10,1fr)}.lgrid{grid-template-columns:32px repeat(10,1fr)}}
+
+.qmt{width:100%;border-collapse:collapse;margin-top:4px}
+.qmt th,.qmt td{border:1px solid var(--line);padding:7px 6px;text-align:center;font-size:11px}
+.qmt th{background:#111417;color:#fff;font-weight:900;font-size:10px}
+.qmt td.name{text-align:left;font-weight:850}
+.qmt td.qc{font-weight:950}
+.qmt td.qc.q1{background:#f3a6a1;color:#6b1f1a}
+.qmt td.qc.q2{background:#f7c896;color:#6b3d10}
+.qmt td.qc.q3{background:#ffe38a;color:#6b5410}
+.qmt td.qc.q4{background:#8fd19e;color:#1d4a2b}
+.qmt td.mintotal{padding:4px}
+.minbarwrap{position:relative;height:24px;background:#eef3ef;border-radius:6px;overflow:hidden;display:flex;align-items:center;min-width:70px}
+.minbarfill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#c9ecd4,#4caf6b);border-radius:6px}
+.minbarlabel{position:relative;z-index:1;margin-left:auto;margin-right:7px;font-weight:950;font-size:11px;color:#173a24}
+.qcmp{font-size:10px;font-weight:850}
+.qcmp.same{color:#2c7b4e}
+.qcmp.up{color:var(--blue)}
+.qcmp.down{color:var(--r)}
+
+.home-view,.plantilla-view{display:none}
+.login-view{display:none}
+.login-box{max-width:340px;margin:60px auto;background:#fff;border:2px solid #e3e6e9;border-radius:14px;padding:26px}
+.login-box h2{margin:0 0 18px;font-size:16px}
+.lf{margin-bottom:14px}
+.lf label{display:block;font-size:11px;font-weight:900;color:#59616a;margin-bottom:5px}
+.lf input{width:100%;padding:11px;border:2px solid #e3e6e9;border-radius:9px;font-size:14px;background:#fff}
+.lf input:focus{border-color:var(--o);outline:none}
+.login-error{color:var(--r);font-size:12px;margin-top:12px;min-height:14px;text-align:center}
+.hero{padding:26px 10px 6px;text-align:center}
+.hero h1{margin:0;font-size:clamp(24px,4vw,40px);color:var(--ink)}
+.hero h1 span{color:var(--o)}
+.hero .sub{color:var(--muted);margin-top:6px;font-size:13px}
+.home-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:16px 0}
+.btn.big{padding:16px 26px;font-size:14px;border-radius:12px;min-width:180px}
+.rp.rp3{grid-template-columns:48px 1fr 64px}
+.plist{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:12px}
+.pcard{display:flex;align-items:center;gap:12px;border:2px solid #e3e6e9;border-radius:13px;padding:10px 12px;background:#fff;transition:border-color .15s}
+.pcard:focus-within{border-color:var(--o)}
+.pcard .pnum{flex:0 0 auto;width:58px;height:58px;border-radius:13px;background:var(--ink2)}
+.pcard .pnum input{width:100%;height:100%;border:0;background:transparent;color:#fff;text-align:center;font-weight:950;font-size:21px;padding:0}
+.pcard .pname{flex:1;min-width:0}
+.pcard .pname input{width:100%;border:0;border-bottom:2px solid #e3e6e9;padding:9px 2px;font-size:16px;font-weight:850;background:transparent;color:var(--ink)}
+.pcard .pname input:focus{border-color:var(--o);outline:none}
+.pcard .premove{flex:0 0 auto;border:0;background:#f3e7e7;color:#9a3f3f;border-radius:10px;min-height:40px;min-width:40px;font-size:15px;font-weight:900}
+.pcard .premove:hover{background:#efd6d6}
+.pcard .premove.confirming{background:#a84040;color:#fff}
+@media(max-width:900px){.plist{grid-template-columns:1fr}}
+@media(max-width:560px){.pcard .pnum{width:48px;height:48px}.pcard .pnum input{font-size:17px}}
+.hist-card{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:6px;background:#fff}
+.hist-main{cursor:pointer;flex:1;min-width:0}
+.hist-rival{font-weight:950;font-size:13px}
+.hist-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.hist-del{border:0;background:#f3e7e7;color:#9a3f3f;border-radius:7px;min-height:32px;min-width:32px;padding:0 8px;font-size:12px;font-weight:900;white-space:nowrap}
+.hist-del:hover{background:#efd6d6}
+.hist-del.confirming{background:#a84040;color:#fff}
+.histgroup{font-weight:950;font-size:12px;color:#59616a;margin:12px 0 6px;text-transform:uppercase;letter-spacing:.03em}
+.histgroup:first-child{margin-top:2px}
+.groupbtn{background:#e7eaed}
+.groupbtn.active{background:var(--ink2);color:#fff}
+@media(max-width:560px){.home-actions{flex-direction:column}.btn.big{width:100%}}
+</style>
+
+</head>
+<body>
+<div class="app" id="app">
+<header>
+ <div class="header">
+  <div><h1>VALENCIA BASKET</h1><div class="sub">Planificación visual de minutajes, rotaciones y combinaciones</div></div>
+  <div class="motto">PREPARAR · VISUALIZAR · DECIDIR</div>
+  <button type="button" class="btn dark" id="logoutBtn" style="display:none">Cerrar sesión</button>
+ </div>
+</header>
+
+<main>
+<section class="login-view" id="loginView" style="display:none">
+ <div class="login-box">
+  <h2>Acceso del cuerpo técnico</h2>
+  <div class="lf"><label>Email</label><input id="loginEmail" type="email" autocomplete="username"></div>
+  <div class="lf"><label>Contraseña</label><input id="loginPass" type="password" autocomplete="current-password"></div>
+  <button type="button" class="btn primary big" id="loginBtn" style="width:100%">Entrar</button>
+  <div class="login-error" id="loginError"></div>
+ </div>
+</section>
+<section class="home-view" id="home" style="display:none">
+ <div class="hero">
+  <h1>VALENCIA BASKET</h1>
+  <div class="sub">Planificación de minutajes, rotaciones y partido en vivo</div>
+ </div>
+ <div class="home-actions">
+  <button type="button" class="btn dark big" id="goPlantilla">👥 Plantilla</button>
+  <button type="button" class="btn primary big" id="newMatch">+ Nuevo partido</button>
+ </div>
+ <div class="box" style="margin-top:14px">
+  <div class="head orange"><h2>HISTORIAL DE PARTIDOS</h2>
+   <div class="actions" id="historyGroupBtns">
+    <button type="button" class="btn groupbtn active" data-group="fecha">Por fecha</button>
+    <button type="button" class="btn groupbtn" data-group="rival">Por rival</button>
+    <button type="button" class="btn groupbtn" data-group="competicion">Por competición</button>
+   </div>
+  </div>
+  <div class="pb" id="historyList"></div>
+ </div>
+</section>
+
+<section class="plantilla-view" id="plantilla" style="display:none">
+ <div class="top" style="grid-template-columns:1fr auto">
+  <div style="font-weight:950;font-size:18px;align-self:center">PLANTILLA DEL EQUIPO</div>
+  <div class="actions"><button type="button" class="btn dark" id="plantillaHome">← Volver al inicio</button></div>
+ </div>
+ <div class="box">
+  <div class="head"><h2>JUGADORAS DE LA PLANTILLA</h2><button type="button" class="btn primary" id="plantillaAddPlayer">+ AÑADIR JUGADORA</button></div>
+  <div class="plist" id="plantillaRoster"></div>
+ </div>
+ <div class="tip"><strong>Nota:</strong> la plantilla y la convocatoria están vinculadas. Toda jugadora de la plantilla aparece siempre en la convocatoria de cualquier partido (nuevo o ya creado), con 0' y convocada por defecto. Si quitas a alguien de la plantilla, sus datos ya jugados en partidos anteriores se mantienen (no se borran), simplemente dejará de añadirse como novedad.</div>
+</section>
+
+<section class="planner-view" id="planner" style="display:none">
+ <div class="top">
+  <div><label>Rival</label><input id="rival" placeholder="Rival"></div>
+  <div><label>Competición</label><input id="competicion" placeholder="Liga / Copa / Amistoso"></div>
+  <div><label>Fecha</label><input id="fecha" type="date"></div>
+  <div><label>Jornada</label><input id="notes" placeholder="Jornada"></div>
+  <div class="actions">
+   <button class="btn" id="plannerHome">🏠 Inicio</button>
+   <button class="btn dark" id="saveJson">Guardar</button>
+   <label class="btn">Abrir<input id="loadJson" type="file" accept=".json" hidden></label>
+   <button class="btn red" id="showLive">🔴 En vivo</button>
+  </div>
+ </div>
+
+ <div class="box">
+  <div class="head orange"><h2>CONVOCATORIA Y MINUTOS PREVISTOS</h2><div style="font-size:10px"><strong id="activeCount">0</strong>/12 seleccionadas · <strong id="activeTargetTotal">0'</strong> marcados</div></div>
+  <div class="pb">
+   <div class="squad-cards" id="selectionCards"></div>
+   <div class="panel-note">Pulsa una tarjeta para convocar o desconvocar (máximo 12 por partido). Los minutos se pueden cambiar directamente sin abrir ningún menú.</div>
+  </div>
+ </div>
+
+ <div class="tip"><strong>Forma de trabajar:</strong> marca primero los minutos que quieres para cada jugadora. Luego construye Q1–Q4 como en tu Excel: quinteto inicial y cambios en el minuto correspondiente. El panel derecho te dice al instante cómo queda realmente el reparto.</div>
+
+ <div class="layout">
+  <div class="qs" id="quarters"></div>
+  <aside class="box side">
+   <div class="head orange"><h2>REPARTO CALCULADO</h2><strong id="status"></strong></div>
+   <div class="sumwrap">
+    <div id="summaries"></div>
+    <div class="metrics">
+     <div class="metric"><strong id="teamTotal">0</strong><span>MIN TOTALES</span></div>
+     <div class="metric"><strong id="maxRun">0'</strong><span>MÁX SEGUIDO</span></div>
+     <div class="metric"><strong id="nQuintets">0</strong><span>QUINTETOS</span></div>
+    </div>
+    <div class="legend">
+     <span><i class="dot" style="background:var(--gry)"></i>&lt;15'</span>
+     <span><i class="dot" style="background:var(--g)"></i>15–22'</span>
+     <span><i class="dot" style="background:var(--y)"></i>22–28'</span>
+     <span><i class="dot" style="background:var(--or)"></i>28–32'</span>
+     <span><i class="dot" style="background:var(--r)"></i>&gt;32'</span>
+    </div>
+   </div>
+  </aside>
+ </div>
+
+ <div class="box" style="margin-top:9px">
+  <div class="head orange"><h3>MINUTOS POR CUARTO</h3></div>
+  <div class="pb" style="overflow:auto" id="quarterMinPlan"></div>
+ </div>
+
+ <div class="analysis">
+  <div class="box">
+   <div class="head orange"><h3>COMBINACIONES · 2 A 5 JUGADORAS</h3><button class="btn" id="clearCombo">Limpiar</button></div>
+   <div class="pb">
+    <div class="players" id="comboButtons"></div>
+    <div class="combo"><div class="who" id="comboWho">Selecciona al menos 2 jugadoras</div><div class="val" id="comboVal">—</div></div>
+   </div>
+  </div>
+  <div class="box">
+   <div class="head"><h3>TOP 5 QUINTETOS MÁS UTILIZADOS</h3></div>
+   <div class="pb"><div class="top5" id="top5"></div></div>
+  </div>
+ </div>
+</section>
+
+<section class="live-view" id="live">
+ <div class="livebar">
+  <div>
+   <div class="livetitle"><span class="livedot"></span> PARTIDO EN VIVO</div>
+   <div class="livemeta" id="liveMeta"></div>
+  </div>
+  <div class="actions">
+   <button class="btn" id="liveHome">🏠</button>
+   <button class="btn" id="liveReset">↺ Recargar plan</button>
+   <button class="btn dark" id="backFromLive">Volver al plan</button>
+   <button class="btn primary" id="showReport">📄 Informe postpartido</button>
+  </div>
+ </div>
+ <div class="livewrap">
+  <div class="tip"><strong>Cómo funciona:</strong> en cada puesto tienes 2 columnas: <span style="color:var(--r);font-weight:900">REAL</span> (pulsa para marcar quién entra de verdad) y <span style="font-weight:900">PLAN</span> (lo que tenías previsto, solo para comparar). Ninguna jugadora ya en pista en ese momento aparece como opción para evitar duplicados.</div>
+  <div id="liveGrid"></div>
+  <div class="box" style="margin-top:10px">
+   <div class="head"><h3>MINUTOS: OBJETIVO · PLAN · REAL</h3></div>
+   <div class="pb" style="overflow:auto"><table class="livetable" id="liveTable"></table></div>
+  </div>
+  <div class="box" style="margin-top:10px">
+   <div class="head orange"><h3>MINUTOS POR CUARTO · REAL</h3></div>
+   <div class="pb" style="overflow:auto" id="quarterMinLive"></div>
+  </div>
+ </div>
+</section>
+
+<section class="report" id="report">
+ <div class="reportbar">
+  <div><h2 class="report-title">INFORME POSTPARTIDO</h2><div class="report-sub" id="reportMeta"></div></div>
+  <div class="actions no-print"><button class="btn" id="reportHome">🏠 Inicio</button><button class="btn" id="backPlan">Volver a en vivo</button><button class="btn primary" id="printReport">Imprimir / Guardar PDF</button><button class="btn dark" id="downloadReport">Descargar informe HTML</button></div>
+ </div>
+ <div class="report-grid">
+  <div class="report-card"><h3>REPARTO DE MINUTOS</h3><div class="report-body"><table class="rtable" id="reportMinutes"></table></div></div>
+  <div class="report-card"><h3>LECTURA RÁPIDA</h3><div class="report-body" id="reportQuick"></div></div>
+  <div class="report-card"><h3>TOP 5 QUINTETOS</h3><div class="report-body" id="reportTop5"></div></div>
+  <div class="report-card"><h3>COMBINACIONES DESTACADAS</h3><div class="report-body" id="reportCombos"></div></div>
+  <div class="report-card" style="grid-column:1/-1"><h3>PLAN VS REAL · MINUTOS POR CUARTO</h3><div class="report-body" style="overflow:auto"><table class="livetable" id="reportQuarterCompare"></table></div></div>
+ </div>
+</section>
+</main>
+</div>
+
+<div class="modal" id="modal">
+ <div class="modalcard">
+  <div class="head"><h3 id="modalTitle">Selecciona jugadora</h3><button class="btn" id="closeModal">Cerrar</button></div>
+  <div class="modalbody"><div class="modalgrid" id="modalGrid"></div><div class="actions" style="justify-content:flex-end;margin-top:9px"><button class="btn red" id="clearChange">✕ Borrar cambio</button></div></div>
+ </div>
+</div>
+
+<script>
+(function(){
+const SUPABASE_URL='https://hcwafeljnassfdfkirln.supabase.co';
+const SUPABASE_KEY='sb_publishable_BRNMSyg6Dn2eFZPNHqmqrg_FKn9_Gxi';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const OLD_KEY='vbc_pregame_visual_v4_roster';
+const SQUAD_KEY='vbc_squad_v5';
+const MATCHES_KEY='vbc_matches_v5';
+const $=id=>document.getElementById(id);
+function blankQuarters(){return Array.from({length:4},()=>({start:['','','','',''],changes:Array.from({length:10},()=>['','','','',''])}))}
+function blankSquad(){return{roster:[]}}
+function loadLocalSquadCache(){try{const x=JSON.parse(localStorage.getItem(SQUAD_KEY));return x&&x.roster?x:null}catch(e){return null}}
+function loadLocalMatchesCache(){try{const x=JSON.parse(localStorage.getItem(MATCHES_KEY));return Array.isArray(x)?x:null}catch(e){return null}}
+function cacheLocally(){try{localStorage.setItem(SQUAD_KEY,JSON.stringify(SQUAD));localStorage.setItem(MATCHES_KEY,JSON.stringify(MATCHES))}catch(e){}}
+function saveSquad(){
+ cacheLocally();
+ sb.from('squad').upsert({id:'main',data:SQUAD,updated_at:new Date().toISOString()}).then(({error})=>{if(error)toast('No se ha podido guardar la plantilla en el servidor: '+error.message)})
+}
+
+let SQUAD=blankSquad();
+let MATCHES=[];
+
+function migrateOld(){
+ try{
+  const raw=localStorage.getItem(OLD_KEY);
+  if(!raw)return;
+  const old=JSON.parse(raw);
+  if(old&&old.roster&&old.quarters){
+   if(!SQUAD.roster.length)SQUAD.roster=old.roster.map(p=>({number:p.number,name:p.name}));
+   MATCHES.push({id:'m'+Date.now(),rival:old.rival||'',competicion:'',fecha:old.fecha||'',notes:old.notes||'',roster:old.roster,quarters:old.quarters,combo:old.combo||[],live:old.live||{quarters:null},createdAt:Date.now(),updatedAt:Date.now()});
+  }
+  localStorage.removeItem(OLD_KEY);
+ }catch(e){}
+}
+
+let s=null;
+let realtimeReady=false;
+
+async function loadRemoteData(){
+ const {data:sq,error:e1}=await sb.from('squad').select('data').eq('id','main').maybeSingle();
+ if(e1)throw e1;
+ SQUAD=(sq&&sq.data&&sq.data.roster)?sq.data:blankSquad();
+ const {data:ms,error:e2}=await sb.from('matches').select('data').order('updated_at',{ascending:false});
+ if(e2)throw e2;
+ MATCHES=(ms||[]).map(r=>r.data);
+}
+async function pushAllLocal(){
+ if(SQUAD.roster&&SQUAD.roster.length)await sb.from('squad').upsert({id:'main',data:SQUAD,updated_at:new Date().toISOString()});
+ if(MATCHES&&MATCHES.length){
+  const rows=MATCHES.map(m=>({id:m.id,data:m,updated_at:new Date().toISOString()}));
+  await sb.from('matches').upsert(rows);
+ }
+}
+function subscribeRealtime(){
+ if(realtimeReady)return;
+ realtimeReady=true;
+ sb.channel('squad-changes').on('postgres_changes',{event:'*',schema:'public',table:'squad'},payload=>{
+  if(!payload.new||!payload.new.data)return;
+  SQUAD=payload.new.data;cacheLocally();
+  if($('plantilla').style.display!=='none')renderPlantilla();
+  if(s)render();
+ }).subscribe();
+ sb.channel('matches-changes').on('postgres_changes',{event:'*',schema:'public',table:'matches'},payload=>{
+  if(payload.eventType==='DELETE'){
+   const id=payload.old&&payload.old.id;if(!id)return;
+   MATCHES=MATCHES.filter(m=>m.id!==id);cacheLocally();
+   if(s&&s.currentMatchId===id){s=null;showView('home')}
+   if($('home').style.display!=='none')renderHistory();
+   return;
+  }
+  const incoming=payload.new&&payload.new.data;if(!incoming)return;
+  const idx=MATCHES.findIndex(m=>m.id===incoming.id);
+  if(idx>=0)MATCHES[idx]=incoming;else MATCHES.push(incoming);
+  cacheLocally();
+  if(s&&s.currentMatchId===incoming.id){
+   s=JSON.parse(JSON.stringify(incoming));s.currentMatchId=incoming.id;
+   if($('planner').style.display!=='none')render();
+   else if($('live').style.display!=='none')renderLive();
+  }
+  if($('home').style.display!=='none')renderHistory();
+ }).subscribe();
+}
+
+function save(){
+ if(s&&s.currentMatchId){
+  const idx=MATCHES.findIndex(m=>m.id===s.currentMatchId);
+  const snap={id:s.currentMatchId,rival:s.rival||'',competicion:s.competicion||'',fecha:s.fecha||'',notes:s.notes||'',roster:s.roster,quarters:s.quarters,combo:s.combo,live:s.live,createdAt:idx>=0?MATCHES[idx].createdAt:Date.now(),updatedAt:Date.now()};
+  if(idx>=0)MATCHES[idx]=snap;else MATCHES.push(snap);
+  cacheLocally();
+  sb.from('matches').upsert({id:snap.id,data:snap,updated_at:new Date().toISOString()}).then(({error})=>{if(error)toast('No se ha podido sincronizar el partido: '+error.message)});
+ }
+}
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function valid(){return s.roster.filter(p=>p.active!==false&&p.number.trim()&&p.name.trim())}
+function gp(id){return s.roster.find(p=>p.number===id)}
+function lab(id){const p=gp(id);return p?`${p.number} · ${p.name}`:id||'—'}
+function lc(m){return m>32?'red':m>=28?'orange':m>=22?'yellow':m>=15?'green':'grey'}
+function toast(msg){alert(msg)}
+function patchQuartersIds(quarters,old,v){quarters.forEach(q=>{q.start=q.start.map(z=>z===old?v:z);q.changes=q.changes.map(r=>r.map(z=>z===old?v:z))})}
+function patchAllIds(old,v){patchQuartersIds(s.quarters,old,v);if(s.live&&s.live.quarters)patchQuartersIds(s.live.quarters,old,v)}
+
+function renderSelectionTable(){
+ const host=$('selectionCards');
+ host.innerHTML='';
+ let activeCount=0,activeTotal=0;
+ s.roster.forEach((p,i)=>{
+   if(p.active==null)p.active=true;
+   if(p.active!==false){activeCount++;activeTotal+=Number(p.target)||0}
+   const card=document.createElement('div');
+   card.className='squad-card '+(p.active!==false?'active':'inactive');
+   card.innerHTML=`
+     <div class="squad-main" data-toggle="${i}">
+       <div class="squad-number">#${esc(p.number)}</div>
+       <div>
+         <div class="squad-name">${esc(p.name)}</div>
+         <div class="squad-status">${p.active!==false?'✓ CONVOCADA':'NO CONVOCADA'}</div>
+       </div>
+     </div>
+     <div class="squad-bottom">
+       <button type="button" class="squad-check" data-check="${i}">${p.active!==false?'✓ En partido':'+ Convocar'}</button>
+       <div class="squad-min"><label>MINUTOS</label><input type="number" min="0" max="40" step="1" data-starget="${i}" value="${Number(p.target)||0}"></div>
+     </div>`;
+   host.appendChild(card);
+ });
+ $('activeCount').textContent=activeCount;
+ $('activeTargetTotal').textContent=activeTotal+"'";
+
+ function toggle(i){
+   const turningOn=s.roster[i].active===false;
+   if(turningOn){
+     const activeNow=s.roster.filter(p=>p.active!==false).length;
+     if(activeNow>=12){toast('Ya tienes 12 jugadoras convocadas (el máximo por partido). Desconvoca a alguna antes de añadir otra.');return}
+   }
+   s.roster[i].active=turningOn?true:false;
+   if(!turningOn){
+     const id=s.roster[i].number;
+     s.quarters.forEach(q=>{q.start=q.start.map(z=>z===id?'':z);q.changes=q.changes.map(r=>r.map(z=>z===id?'':z))});
+     s.combo=s.combo.filter(z=>z!==id);
+   }
+   save();render();
+ }
+ host.querySelectorAll('[data-toggle]').forEach(x=>x.addEventListener('click',()=>toggle(+x.dataset.toggle)));
+ host.querySelectorAll('[data-check]').forEach(x=>x.addEventListener('click',e=>{e.stopPropagation();toggle(+x.dataset.check)}));
+ host.querySelectorAll('[data-starget]').forEach(x=>x.addEventListener('click',e=>e.stopPropagation()));
+ host.querySelectorAll('[data-starget]').forEach(x=>x.addEventListener('input',()=>{
+   const i=+x.dataset.starget;let v=parseInt(x.value||0,10);if(!Number.isFinite(v))v=0;v=Math.max(0,Math.min(40,v));
+   s.roster[i].target=v;save();renderSummary();
+   $('activeTargetTotal').textContent=s.roster.filter(p=>p.active!==false).reduce((a,p)=>a+(Number(p.target)||0),0)+"'";
+ }));
+}
+
+let ctx=null;
+function lineupBeforeRow(quarters,qi,r){
+ let lineup=[...quarters[qi].start];
+ for(let rr=0;rr<r;rr++){for(let c=0;c<5;c++){const inc=quarters[qi].changes[rr][c];if(inc)lineup[c]=inc}}
+ return lineup
+}
+function openPicker(c){
+ ctx=c;
+ const quarters=c.target==='live'?liveQuarters():s.quarters;
+ const label=c.target==='live'?' · EN VIVO':'';
+ $('modalTitle').textContent=(c.type==='start'?`Q${c.q+1} · Quinteto inicial · puesto ${c.c+1}`:`Q${c.q+1} · Minuto ${9-c.r} · entra en puesto ${c.c+1}`)+label;
+ const g=$('modalGrid');g.innerHTML='';
+ const onCourt=c.type==='start'?quarters[c.q].start:lineupBeforeRow(quarters,c.q,c.r);
+ const excluded=new Set(onCourt.filter(Boolean));
+ const options=valid().filter(p=>!excluded.has(p.number));
+ if(!options.length)g.innerHTML='<div class="meta">No quedan jugadoras libres: todas las convocadas ya están en pista en este momento.</div>';
+ options.forEach(p=>{
+  const b=document.createElement('button');b.type='button';b.className='mp';
+  b.innerHTML=`#${esc(p.number)}<small>${esc(p.name)}</small>`;
+  b.addEventListener('click',()=>{
+   if(c.type==='start')quarters[c.q].start[c.c]=p.number;else quarters[c.q].changes[c.r][c.c]=p.number;
+   save();closePicker();
+   if(c.target==='live')renderLive();else render()
+  });
+  g.appendChild(b)
+ });
+ $('clearChange').style.display=c.type==='change'?'inline-block':'none';
+ $('modal').classList.add('open')
+}
+function closePicker(){$('modal').classList.remove('open')}
+
+function renderQuarters(){
+ const h=$('quarters');h.innerHTML='';
+ s.quarters.forEach((q,qi)=>{
+  const sec=document.createElement('section');sec.className='q';
+  sec.innerHTML=`<div class="qh"><strong>Q${qi+1}</strong><span>QUINTETO INICIAL + CAMBIOS</span></div>`;
+  const sr=document.createElement('div');sr.className='start';sr.innerHTML='<div class="startlabel">INICIO</div>';
+  q.start.forEach((id,c)=>{
+   const b=document.createElement('button');b.type='button';b.className='pick';
+   b.innerHTML=id?`#${esc(id)}<small>${esc(gp(id)?.name||'')}</small>`:'—';
+   b.addEventListener('click',()=>openPicker({type:'start',q:qi,c}));sr.appendChild(b)
+  });sec.appendChild(sr);
+  const grid=document.createElement('div');grid.className='grid';
+  grid.innerHTML='<div class="c h">MIN</div>'+[1,2,3,4,5].map(n=>`<div class="c h">P${n}</div>`).join('');
+  for(let min=9;min>=0;min--){
+   const r=9-min;const mc=document.createElement('div');mc.className='c m';mc.textContent=min;grid.appendChild(mc);
+   for(let c=0;c<5;c++){
+    const cell=document.createElement('div');cell.className='c';
+    const b=document.createElement('button');b.type='button';b.className='change';const id=q.changes[r][c];
+    b.innerHTML=id?`#${esc(id)}<small>${esc(gp(id)?.name||'')}</small>`:'';
+    b.addEventListener('click',()=>openPicker({type:'change',q:qi,r,c}));cell.appendChild(b);grid.appendChild(cell)
+   }
+  }
+  sec.appendChild(grid);h.appendChild(sec)
+ })
+}
+
+function plan(quarters){
+ quarters=quarters||s.quarters;
+ const snaps=[],errors=[];
+ quarters.forEach((q,qi)=>{
+  let lineup=[...q.start];
+  if(lineup.filter(Boolean).length!==5)errors.push(`Q${qi+1}: quinteto inicial incompleto`);
+  if(lineup.filter(Boolean).length===5&&new Set(lineup).size!==5)errors.push(`Q${qi+1}: jugadora repetida en el quinteto inicial`);
+  for(let min=10;min>0;min--){
+   snaps.push({q:qi,from:min,to:min-1,lineup:[...lineup]});
+   const next=min-1,r=9-next;
+   if(next>=0&&next<=9){
+    for(let c=0;c<5;c++){const inc=q.changes[r][c];if(inc)lineup[c]=inc}
+    const filled=lineup.filter(Boolean);
+    if(filled.length===5&&new Set(filled).size!==5)errors.push(`Q${qi+1}, minuto ${next}: jugadora duplicada`)
+   }
+  }
+ });
+ return{snaps,errors}
+}
+function planUpto(quarters,uptoQ,uptoMin){
+ const snaps=[];
+ quarters.forEach((q,qi)=>{
+  if(qi>uptoQ)return;
+  let lineup=[...q.start];
+  const limitMin=(qi===uptoQ)?uptoMin:0;
+  for(let min=10;min>limitMin;min--){
+   snaps.push({q:qi,from:min,to:min-1,lineup:[...lineup]});
+   const next=min-1,r=9-next;
+   if(next>=0&&next<=9){for(let c=0;c<5;c++){const inc=q.changes[r][c];if(inc)lineup[c]=inc}}
+  }
+ });
+ return{snaps}
+}
+function metrics(snaps){
+ const ids=valid().map(p=>p.number),tot={},max={},cur={},tl={};
+ ids.forEach(id=>{tot[id]=0;max[id]=0;cur[id]=0;tl[id]=[]});
+ snaps.forEach(x=>ids.forEach(id=>{const on=x.lineup.includes(id);tl[id].push(on);if(on){tot[id]++;cur[id]++;max[id]=Math.max(max[id],cur[id])}else cur[id]=0}));
+ return{tot,max,tl}
+}
+function quarterMinutes(quarters){
+ const {snaps}=plan(quarters);
+ const ids=valid().map(p=>p.number),byQ={};
+ ids.forEach(id=>byQ[id]=[0,0,0,0]);
+ snaps.forEach(x=>{ids.forEach(id=>{if(x.lineup.includes(id))byQ[id][x.q]++})});
+ return byQ
+}
+function qcell(m){const cls=m<=2?'q1':m<=4?'q2':m<=6?'q3':'q4';return `<td class="qc ${cls}">${m}</td>`}
+function renderQuarterMinutes(hostId,quarters){
+ const host=$(hostId);if(!host)return;
+ const byQ=quarterMinutes(quarters);
+ let t='<table class="qmt"><tr><th style="text-align:left">JUGADORA</th><th>MIN</th><th>1Q</th><th>2Q</th><th>3Q</th><th>4Q</th></tr>';
+ valid().forEach(p=>{
+  const qs=byQ[p.number]||[0,0,0,0],tot=qs.reduce((a,b)=>a+b,0),pct=Math.min(100,Math.round(tot/40*100));
+  t+=`<tr><td class="name">${esc(p.name)}</td><td class="mintotal"><div class="minbarwrap"><div class="minbarfill" style="width:${pct}%"></div><span class="minbarlabel">${tot}'</span></div></td>${qs.map(qcell).join('')}</tr>`
+ });
+ t+='</table>';
+ t+='<div class="legend" style="margin-top:8px"><span><i class="dot" style="background:#f3a6a1"></i>0–2\' por cuarto</span><span><i class="dot" style="background:#f7c896"></i>3–4\'</span><span><i class="dot" style="background:#ffe38a"></i>5–6\'</span><span><i class="dot" style="background:#8fd19e"></i>7–10\'</span></div>';
+ host.innerHTML=t
+}
+function quintets(snaps){
+ const map=new Map();
+ snaps.forEach((x,idx)=>{
+  if(x.lineup.filter(Boolean).length!==5||new Set(x.lineup).size!==5)return;
+  const ids=[...x.lineup].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true})),key=ids.join('|');
+  if(!map.has(key))map.set(key,{ids,minutes:0,segments:0,last:-2});
+  const o=map.get(key);o.minutes++;if(o.last!==idx-1)o.segments++;o.last=idx
+ });
+ return[...map.values()].sort((a,b)=>b.minutes-a.minutes||b.segments-a.segments)
+}
+function comboM(snaps,ids){return ids.length<2?0:snaps.filter(x=>ids.every(id=>x.lineup.includes(id))).length}
+
+function renderSummary(){
+ const {snaps,errors}=plan(),m=metrics(snaps),h=$('summaries');h.innerHTML='';
+ valid().forEach(p=>{
+  const mins=m.tot[p.number]||0,t=Number(p.target)||0,d=mins-t;
+  const el=document.createElement('div');el.className='ps '+lc(mins);
+  const dt=!t?'Sin minutaje marcado':d===0?'Cuadra con lo marcado':`${d>0?'+':''}${d}' vs marcado`;
+  const dc=!t?'':d===0?'ok':d>0?'more':'less';
+  el.innerHTML=`<div class="pst"><div><div class="pn">#${esc(p.number)} ${esc(p.name)}</div><div class="meta">Marcado ${t}' · Máx seguido ${m.max[p.number]||0}'</div><div class="diff ${dc}">${dt}</div></div><div class="pm">${mins}'</div></div><div class="tl">${(m.tl[p.number]||[]).map((on,i)=>`<span class="${on?'on ':''}${[9,19,29,39].includes(i)?'sep':''}"></span>`).join('')}</div>`;
+  el.addEventListener('click',()=>{if(s.combo.includes(p.number))s.combo=s.combo.filter(z=>z!==p.number);else if(s.combo.length<5)s.combo.push(p.number);save();renderAnalysis()});
+  h.appendChild(el)
+ });
+ const total=Object.values(m.tot).reduce((a,b)=>a+b,0),qs=quintets(snaps);
+ $('teamTotal').textContent=total;$('maxRun').textContent=Math.max(0,...Object.values(m.max))+"'";$('nQuintets').textContent=qs.length;
+ $('status').textContent=errors.length?'REVISAR':'PLAN OK';$('status').style.color=errors.length?'#ffd1d1':'#d8ffe7';$('status').title=errors.join('\n');
+ renderSelectionTable();
+}
+function renderAnalysis(){
+ const {snaps}=plan(),b=$('comboButtons');b.innerHTML='';
+ valid().forEach(p=>{
+  const x=document.createElement('button');x.type='button';x.className='pill'+(s.combo.includes(p.number)?' sel':'');x.textContent=`#${p.number} ${p.name}`;
+  x.addEventListener('click',()=>{if(s.combo.includes(p.number))s.combo=s.combo.filter(z=>z!==p.number);else if(s.combo.length<5)s.combo.push(p.number);else{toast('Máximo 5 jugadoras');return}save();renderAnalysis()});b.appendChild(x)
+ });
+ $('comboWho').textContent=s.combo.length>=2?s.combo.map(lab).join(' + '):'Selecciona al menos 2 jugadoras';
+ $('comboVal').textContent=s.combo.length>=2?comboM(snaps,s.combo)+"'":'—';
+ const top=quintets(snaps).slice(0,5),h=$('top5');h.innerHTML='';
+ if(!top.length)h.innerHTML='<div class="meta">Completa la planificación para ver quintetos.</div>';
+ top.forEach((q,i)=>{const d=document.createElement('div');d.className='qrow';d.innerHTML=`<div class="qrowtop"><div class="nums">${i+1}. ${q.ids.map(x=>'#'+esc(x)).join(' · ')}</div><div class="mins">${q.minutes}'</div></div><div class="names">${esc(q.ids.map(x=>gp(x)?.name||x).join(' · '))}</div><div class="segments">${q.segments} ${q.segments===1?'tramo':'tramos'}</div>`;h.appendChild(d)})
+}
+
+function allPairs(snaps){
+ const ps=valid(),out=[];
+ for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++){const m=comboM(snaps,[ps[i].number,ps[j].number]);out.push({ids:[ps[i].number,ps[j].number],m})}
+ return out.sort((a,b)=>b.m-a.m)
+}
+function rotationRows(){
+ const rows=[];
+ s.quarters.forEach((q,qi)=>{
+  q.changes.forEach((r,ri)=>r.forEach((inc,c)=>{
+   if(inc)rows.push({q:qi+1,min:9-ri,pos:c+1,in:inc})
+  }))
+ });
+ return rows
+}
+function buildReport(){
+ const {snaps,errors}=plan(),m=metrics(snaps),qs=quintets(snaps).slice(0,5),pairs=allPairs(snaps).slice(0,10);
+ const hasLive=s.live&&s.live.quarters;
+ const mReal=hasLive?metrics(plan(liveQuarters()).snaps):null;
+ $('reportMeta').textContent=[s.rival?`Rival: ${s.rival}`:'',s.fecha?`Fecha: ${s.fecha}`:'',s.notes?`Jornada: ${s.notes}`:''].filter(Boolean).join(' · ');
+ let t='<tr><th>#</th><th>Jugadora</th><th>Marcado</th><th>Calculado</th><th>Real</th><th>Diferencia</th><th>Máx seguido</th></tr>';
+ valid().forEach(p=>{const a=Number(p.target)||0,b=m.tot[p.number]||0,d=b-a,real=mReal?(mReal.tot[p.number]||0):null;t+=`<tr><td>${esc(p.number)}</td><td class="name">${esc(p.name)}</td><td>${a}'</td><td><strong>${b}'</strong></td><td>${real===null?'—':real+"'"}</td><td>${a?(d>0?'+':'')+d+"'":'—'}</td><td>${m.max[p.number]||0}'</td></tr>`});
+ $('reportMinutes').innerHTML=t;
+ const vals=valid().map(p=>({p,min:m.tot[p.number]||0,max:m.max[p.number]||0}));
+ const most=[...vals].sort((a,b)=>b.min-a.min)[0],least=[...vals].sort((a,b)=>a.min-b.min)[0],long=[...vals].sort((a,b)=>b.max-a.max)[0];
+ $('reportQuick').innerHTML=`<div class="report-combo">
+ <div class="rcombo"><strong>Total equipo</strong><br>${Object.values(m.tot).reduce((a,b)=>a+b,0)}' / 200'</div>
+ <div class="rcombo"><strong>Estado</strong><br>${errors.length?'Revisar plan':'Plan correcto'}</div>
+ <div class="rcombo"><strong>Más minutos</strong><br>${most?esc(most.p.name)+' · '+most.min+"'":'—'}</div>
+ <div class="rcombo"><strong>Menos minutos</strong><br>${least?esc(least.p.name)+' · '+least.min+"'":'—'}</div>
+ <div class="rcombo"><strong>Tramo seguido más largo</strong><br>${long?esc(long.p.name)+' · '+long.max+"'":'—'}</div>
+ <div class="rcombo"><strong>Quintetos distintos</strong><br>${quintets(snaps).length}</div></div>`;
+ $('reportTop5').innerHTML=qs.length?qs.map((q,i)=>`<div class="qrow"><div class="qrowtop"><div class="nums">${i+1}. ${q.ids.map(x=>'#'+esc(x)).join(' · ')}</div><div class="mins">${q.minutes}'</div></div><div class="names">${esc(q.ids.map(x=>gp(x)?.name||x).join(' · '))}</div><div class="segments">${q.segments} ${q.segments===1?'tramo':'tramos'}</div></div>`).join(''):'Sin datos';
+ $('reportCombos').innerHTML=pairs.length?'<div class="report-combo">'+pairs.map(x=>`<div class="rcombo"><strong>${esc(x.ids.map(lab).join(' + '))}</strong><br>${x.m}' juntas</div>`).join('')+'</div>':'Sin datos';
+ if(!hasLive){
+  $('reportQuarterCompare').innerHTML='<tr><td style="padding:10px;text-align:left;border:1px solid var(--line)">Todavía no se ha registrado nada en «Partido en vivo» para este partido. En cuanto marques cambios reales ahí, aquí aparecerá la comparación cuarto a cuarto.</td></tr>';
+ }else{
+  const byQPlan=quarterMinutes(s.quarters),byQReal=quarterMinutes(liveQuarters());
+  let qt='<tr><th style="text-align:left">Jugadora</th><th>1Q</th><th>2Q</th><th>3Q</th><th>4Q</th><th>Total plan</th><th>Total real</th><th>Diferencia</th></tr>';
+  valid().forEach(p=>{
+   const pq=byQPlan[p.number]||[0,0,0,0],rq=byQReal[p.number]||[0,0,0,0];
+   const totalP=pq.reduce((a,b)=>a+b,0),totalR=rq.reduce((a,b)=>a+b,0),diff=totalR-totalP;
+   const dc=diff===0?'ok':diff>0?'more':'less';
+   const qcells=pq.map((pv,i)=>{const rv=rq[i],d=rv-pv,cls=d===0?'same':d>0?'up':'down';return `<td class="qcmp ${cls}">${pv}' → ${rv}'</td>`}).join('');
+   qt+=`<tr><td class="name">${esc(p.name)}</td>${qcells}<td>${totalP}'</td><td><strong>${totalR}'</strong></td><td class="diff ${dc}">${diff>0?'+':''}${diff}'</td></tr>`
+  });
+  $('reportQuarterCompare').innerHTML=qt
+ }
+}
+/* ===== PARTIDO EN VIVO ===== */
+function ensureLive(){
+ if(!s.live)s.live={quarters:null};
+ if(!s.live.quarters)s.live.quarters=JSON.parse(JSON.stringify(s.quarters));
+}
+function liveQuarters(){ensureLive();return s.live.quarters}
+function renderLiveGrid(){
+ const h=$('liveGrid');h.innerHTML='';
+ const lq=liveQuarters();
+ s.quarters.forEach((q,qi)=>{
+  const sec=document.createElement('section');sec.className='q';
+  sec.innerHTML=`<div class="qh"><strong>Q${qi+1}</strong><span>REAL vs PLAN</span></div>`;
+  const sr=document.createElement('div');sr.className='start lstart';sr.innerHTML='<div class="startlabel">INICIO</div>';
+  for(let c=0;c<5;c++){
+   const rb=document.createElement('button');rb.type='button';rb.className='pick realc';
+   const rid=lq[qi].start[c];
+   rb.innerHTML=rid?`#${esc(rid)}<small>${esc(gp(rid)?.name||'')}</small>`:'—';
+   rb.addEventListener('click',()=>openPicker({type:'start',q:qi,c,target:'live'}));
+   sr.appendChild(rb);
+   const pid=q.start[c];
+   const pd=document.createElement('div');pd.className='pick planc';
+   pd.innerHTML=pid?`#${esc(pid)}<small>${esc(gp(pid)?.name||'')}</small>`:'—';
+   sr.appendChild(pd);
+  }
+  sec.appendChild(sr);
+  const grid=document.createElement('div');grid.className='grid lgrid';
+  let hd='<div class="c h">MIN</div>';
+  for(let n=1;n<=5;n++)hd+=`<div class="c h realc">P${n} REAL</div><div class="c h planc">PLAN</div>`;
+  grid.innerHTML=hd;
+  for(let min=9;min>=0;min--){
+   const r=9-min;
+   const mc=document.createElement('div');mc.className='c m';mc.textContent=min;grid.appendChild(mc);
+   for(let c=0;c<5;c++){
+    const rcell=document.createElement('div');rcell.className='c';
+    const rb=document.createElement('button');rb.type='button';rb.className='change realc';
+    const rid=lq[qi].changes[r][c];
+    rb.innerHTML=rid?`#${esc(rid)}<small>${esc(gp(rid)?.name||'')}</small>`:'';
+    rb.addEventListener('click',()=>openPicker({type:'change',q:qi,r,c,target:'live'}));
+    rcell.appendChild(rb);grid.appendChild(rcell);
+    const pcell=document.createElement('div');pcell.className='c planc';
+    const pid=q.changes[r][c];
+    pcell.innerHTML=pid?`#${esc(pid)}<small>${esc(gp(pid)?.name||'')}</small>`:'';
+    grid.appendChild(pcell)
+   }
+  }
+  sec.appendChild(grid);h.appendChild(sec)
+ })
+}
+function renderLiveTable(){
+ const lm=metrics(plan(liveQuarters()).snaps),pm=metrics(plan(s.quarters).snaps);
+ let t='<tr><th>#</th><th>Jugadora</th><th>Objetivo</th><th>Plan</th><th>Real</th><th>Diferencia</th></tr>';
+ valid().forEach(p=>{
+  const obj=Number(p.target)||0,planMin=pm.tot[p.number]||0,realMin=lm.tot[p.number]||0,diff=realMin-planMin;
+  const dc=diff===0?'ok':diff>0?'more':'less';
+  t+=`<tr><td>${esc(p.number)}</td><td class="name">${esc(p.name)}</td><td>${obj}'</td><td>${planMin}'</td><td><strong>${realMin}'</strong></td><td class="diff ${dc}">${diff>0?'+':''}${diff}'</td></tr>`
+ });
+ $('liveTable').innerHTML=t
+}
+function renderLive(){
+ ensureLive();
+ $('liveMeta').textContent=[s.rival?`Rival: ${s.rival}`:'',s.fecha?`Fecha: ${s.fecha}`:''].filter(Boolean).join(' · ')||'Sin datos de partido';
+ renderLiveGrid();renderLiveTable();renderQuarterMinutes('quarterMinLive',liveQuarters())
+}
+$('liveReset').addEventListener('click',()=>{
+ const b=$('liveReset');clearTimeout(b._t);
+ if(b.dataset.confirm==='1'){
+  s.live.quarters=JSON.parse(JSON.stringify(s.quarters));save();renderLive();
+  b.dataset.confirm='';b.textContent='↺ Recargar plan';b.classList.remove('confirming');
+  return;
+ }
+ b.dataset.confirm='1';b.textContent='✓ Seguro: sobrescribe lo marcado';b.classList.add('confirming');
+ b._t=setTimeout(()=>{b.dataset.confirm='';b.textContent='↺ Recargar plan';b.classList.remove('confirming')},3000)
+});
+$('showLive').addEventListener('click',()=>{ensureLive();showView('live');renderLive()});
+$('backFromLive').addEventListener('click',()=>{showView('planner')});
+$('liveHome').addEventListener('click',()=>{showView('home');renderHistory()});
+/* ===== FIN PARTIDO EN VIVO ===== */
+
+/* ===== PLANTILLA (maestra) ===== */
+function renderPlantilla(){
+ const h=$('plantillaRoster');h.innerHTML='';
+ SQUAD.roster.forEach((p,i)=>{
+  const d=document.createElement('div');d.className='pcard';
+  d.innerHTML=`<div class="pnum"><input data-pnum="${i}" aria-label="Dorsal" inputmode="numeric" value="${esc(p.number)}"></div><div class="pname"><input data-pname="${i}" aria-label="Nombre" placeholder="Nombre de la jugadora" value="${esc(p.name)}"></div><button type="button" class="premove" data-premove="${i}" title="Eliminar de la plantilla">✕</button>`;
+  h.appendChild(d)
+ });
+ h.querySelectorAll('[data-pnum]').forEach(x=>x.addEventListener('change',()=>{
+  const i=+x.dataset.pnum,old=SQUAD.roster[i].number,v=x.value.trim();
+  if(v&&SQUAD.roster.some((p,j)=>j!==i&&p.number===v)){toast('Ese dorsal ya está utilizado');x.value=old;return}
+  SQUAD.roster[i].number=v;saveSquad()
+ }));
+ h.querySelectorAll('[data-pname]').forEach(x=>x.addEventListener('input',()=>{SQUAD.roster[+x.dataset.pname].name=x.value;saveSquad()}));
+ h.querySelectorAll('[data-premove]').forEach(x=>x.addEventListener('click',()=>{
+  clearTimeout(x._t);
+  if(x.dataset.confirm==='1'){
+   const i=+x.dataset.premove;
+   SQUAD.roster.splice(i,1);saveSquad();renderPlantilla();
+   return;
+  }
+  x.dataset.confirm='1';x.textContent='✓';x.title='Pulsa otra vez para confirmar';x.classList.add('confirming');
+  x._t=setTimeout(()=>{x.dataset.confirm='';x.textContent='✕';x.title='Eliminar de la plantilla';x.classList.remove('confirming')},3000)
+ }));
+}
+$('plantillaAddPlayer').addEventListener('click',()=>{
+ let next=1;const used=new Set(SQUAD.roster.map(p=>String(p.number)));while(used.has(String(next)))next++;
+ SQUAD.roster.push({number:String(next),name:'Nueva jugadora'});saveSquad();renderPlantilla()
+});
+$('goPlantilla').addEventListener('click',()=>{showView('plantilla');renderPlantilla()});
+$('plantillaHome').addEventListener('click',()=>{showView('home');renderHistory()});
+$('plannerHome').addEventListener('click',()=>{showView('home');renderHistory()});
+$('reportHome').addEventListener('click',()=>{showView('home');renderHistory()});
+/* ===== FIN PLANTILLA ===== */
+
+/* ===== INICIO / HISTORIAL DE PARTIDOS ===== */
+function showView(name){
+ $('loginView').style.display=name==='login'?'block':'none';
+ $('logoutBtn').style.display=name==='login'?'none':'inline-block';
+ $('home').style.display=name==='home'?'block':'none';
+ $('plantilla').style.display=name==='plantilla'?'block':'none';
+ $('planner').style.display=name==='planner'?'block':'none';
+ $('live').style.display=name==='live'?'block':'none';
+ if(name==='report')$('report').classList.add('open');else $('report').classList.remove('open');
+ window.scrollTo(0,0)
+}
+let historyGroup='fecha';
+function renderHistory(){
+ $('historyGroupBtns').querySelectorAll('.groupbtn').forEach(b=>b.classList.toggle('active',b.dataset.group===historyGroup));
+ const host=$('historyList');host.innerHTML='';
+ if(!MATCHES.length){host.innerHTML='<div class="meta">Todavía no hay partidos guardados. Pulsa «+ Nuevo partido» para crear el primero.</div>';return}
+ const sorted=[...MATCHES].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+ if(historyGroup==='fecha'){renderHistoryCards(host,sorted);return}
+ const groups=new Map();
+ sorted.forEach(m=>{
+  const g=(m[historyGroup]||'').trim()||(historyGroup==='rival'?'Rival sin definir':'Competición sin definir');
+  if(!groups.has(g))groups.set(g,[]);
+  groups.get(g).push(m)
+ });
+ [...groups.keys()].sort((a,b)=>a.localeCompare(b,'es')).forEach(g=>{
+  const h4=document.createElement('div');h4.className='histgroup';h4.textContent=`${g} (${groups.get(g).length})`;host.appendChild(h4);
+  renderHistoryCards(host,groups.get(g))
+ })
+}
+function renderHistoryCards(host,list){
+ list.forEach(m=>{
+  const card=document.createElement('div');card.className='hist-card';
+  const dateLabel=m.fecha?new Date(m.fecha+'T00:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'}):'Sin fecha';
+  const open=document.createElement('div');open.className='hist-main';
+  open.innerHTML=`<div class="hist-rival">${esc(m.rival||'Rival sin definir')}</div><div class="hist-meta">${esc(dateLabel)}${m.competicion?' · '+esc(m.competicion):''}</div>`;
+  open.addEventListener('click',()=>openMatch(m.id));
+  const del=document.createElement('button');del.type='button';del.className='hist-del';del.title='Eliminar partido';del.textContent='🗑';
+  del.addEventListener('click',e=>{
+   e.stopPropagation();
+   clearTimeout(del._t);
+   if(del.dataset.confirm==='1'){
+    MATCHES=MATCHES.filter(z=>z.id!==m.id);cacheLocally();
+    if(s&&s.currentMatchId===m.id){s=null}
+    sb.from('matches').delete().eq('id',m.id).then(({error})=>{if(error)toast('No se ha podido borrar el partido en el servidor: '+error.message)});
+    renderHistory();
+    return;
+   }
+   del.dataset.confirm='1';del.textContent='✓ Seguro';del.title='Pulsa otra vez para confirmar';del.classList.add('confirming');
+   del._t=setTimeout(()=>{del.dataset.confirm='';del.textContent='🗑';del.title='Eliminar partido';del.classList.remove('confirming')},3000)
+  });
+  card.appendChild(open);card.appendChild(del);host.appendChild(card)
+ })
+}
+function syncRosterFromSquad(){
+ SQUAD.roster.forEach(sp=>{
+  const existing=s.roster.find(p=>p.number===sp.number);
+  if(existing){existing.name=sp.name}
+  else{s.roster.push({number:sp.number,name:sp.name,target:0,active:true})}
+ })
+}
+function openMatch(id){
+ const m=MATCHES.find(z=>z.id===id);if(!m)return;
+ s=JSON.parse(JSON.stringify(m));s.currentMatchId=id;
+ ensureLive();
+ showView('planner');render()
+}
+$('historyGroupBtns').querySelectorAll('.groupbtn').forEach(b=>b.addEventListener('click',()=>{historyGroup=b.dataset.group;renderHistory()}));
+$('newMatch').addEventListener('click',()=>{
+ const id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+ const roster=SQUAD.roster.map(p=>({number:p.number,name:p.name,target:0,active:true}));
+ s={rival:'',competicion:'',fecha:'',notes:'',roster,quarters:blankQuarters(),combo:[],live:{quarters:null},currentMatchId:id};
+ save();showView('planner');render()
+});
+/* ===== FIN INICIO / HISTORIAL ===== */
+
+function render(){
+ syncRosterFromSquad();
+ s.roster.forEach(p=>{if(p.target==null)p.target=0;if(p.active==null)p.active=true});$('rival').value=s.rival||'';$('competicion').value=s.competicion||'';$('fecha').value=s.fecha||'';$('notes').value=s.notes||'';
+ renderQuarters();renderSummary();renderAnalysis();renderQuarterMinutes('quarterMinPlan',s.quarters)
+}
+$('rival').addEventListener('input',e=>{s.rival=e.target.value;save()});$('competicion').addEventListener('input',e=>{s.competicion=e.target.value;save()});$('fecha').addEventListener('change',e=>{s.fecha=e.target.value;save()});$('notes').addEventListener('input',e=>{s.notes=e.target.value;save()});
+$('closeModal').addEventListener('click',closePicker);$('modal').addEventListener('click',e=>{if(e.target.id==='modal')closePicker()});
+$('clearChange').addEventListener('click',()=>{
+ if(!ctx||ctx.type!=='change')return;
+ const quarters=ctx.target==='live'?liveQuarters():s.quarters;
+ quarters[ctx.q].changes[ctx.r][ctx.c]='';save();closePicker();
+ if(ctx.target==='live')renderLive();else render()
+});
+$('clearCombo').addEventListener('click',()=>{s.combo=[];save();renderAnalysis()});
+
+$('saveJson').addEventListener('click',()=>{
+ try{
+  const blob=new Blob([JSON.stringify(s,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`VBC_${(s.rival||'plan').replace(/\s+/g,'_')}.json`;a.rel='noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }catch(err){
+  toast('No se ha podido generar el archivo de copia de seguridad.');
+ }
+});
+$('loadJson').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const x=JSON.parse(await f.text());if(!x.roster||!x.quarters)throw Error();s=x;if(!s.currentMatchId)s.currentMatchId='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);if(!s.live)s.live={quarters:null};save();render()}catch(err){toast('Archivo no válido')}e.target.value=''});
+$('showReport').addEventListener('click',()=>{buildReport();showView('report')});
+$('backPlan').addEventListener('click',()=>{ensureLive();showView('live');renderLive()});
+$('printReport').addEventListener('click',()=>{buildReport();window.print()});
+$('downloadReport').addEventListener('click',()=>{
+ buildReport();
+ const reportHtml=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Informe Postpartido VBC</title><style>${document.querySelector('style').textContent}</style>
+<style>
+.squad-cards{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:8px;
+}
+.squad-card{
+  position:relative;
+  border:2px solid #d7dce1;
+  border-radius:12px;
+  background:#f7f8f9;
+  padding:10px;
+  min-width:0;
+  transition:border-color .15s ease,background .15s ease,transform .15s ease;
+}
+.squad-card.active{
+  background:#fff8f2;
+  border-color:var(--o);
+}
+.squad-card.inactive{
+  opacity:.55;
+  background:#f1f2f3;
+}
+.squad-main{
+  display:grid;
+  grid-template-columns:46px minmax(0,1fr);
+  gap:8px;
+  align-items:center;
+  cursor:pointer;
+}
+.squad-number{
+  width:46px;height:46px;border-radius:12px;
+  background:#252a30;color:white;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:950;
+}
+.squad-card.active .squad-number{background:var(--o)}
+.squad-name{
+  font-size:12px;font-weight:950;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.squad-status{
+  margin-top:2px;
+  font-size:9px;font-weight:900;
+  color:#6b737b;
+}
+.squad-bottom{
+  display:grid;
+  grid-template-columns:1fr 68px;
+  gap:7px;
+  align-items:end;
+  margin-top:9px;
+}
+.squad-check{
+  min-height:34px;border:0;border-radius:8px;
+  background:#e4e7ea;color:#4e565e;
+  font-size:10px;font-weight:950;
+}
+.squad-card.active .squad-check{
+  background:#252a30;color:white;
+}
+.squad-min label{
+  font-size:8px;margin-bottom:2px;text-align:center;
+}
+.squad-min input{
+  min-height:34px;
+  text-align:center;
+  font-size:15px;
+  font-weight:950;
+  border:2px solid #f1b27a;
+  background:white;
+}
+.squad-card.inactive .squad-min input{
+  border-color:#d3d7db;
+  background:#eceeef;
+}
+@media(max-width:1200px){.squad-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.squad-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
+</head><body><div class="app"><main><section class="report open">${$('report').innerHTML.replace(/<div class="actions no-print">[\s\S]*?<\/div><\/div>/,'</div>')}</section></main></div></body></html>`;
+ const blob=new Blob([reportHtml],{type:'text/html'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');
+ a.href=url;a.download=`Informe_Postpartido_VBC_${(s.rival||'partido').replace(/\s+/g,'_')}.html`;a.rel='noopener';
+ document.body.appendChild(a);
+ a.click();
+ a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000)
+});
+
+async function afterLogin(){
+ $('logoutBtn').style.display='inline-block';
+ const hadLocalData=(SQUAD.roster&&SQUAD.roster.length)||(MATCHES&&MATCHES.length);
+ const localSquadSnapshot=SQUAD,localMatchesSnapshot=MATCHES;
+ try{
+  await loadRemoteData();
+ }catch(err){
+  toast('No se ha podido conectar con el servidor. Comprueba tu conexión a internet.');
+  SQUAD=loadLocalSquadCache()||localSquadSnapshot;
+  MATCHES=loadLocalMatchesCache()||localMatchesSnapshot;
+  showView('home');renderHistory();
+  return;
+ }
+ const remoteEmpty=(!SQUAD.roster||!SQUAD.roster.length)&&(!MATCHES||!MATCHES.length);
+ if(remoteEmpty&&hadLocalData){
+  SQUAD=localSquadSnapshot;MATCHES=localMatchesSnapshot;
+  try{await pushAllLocal()}catch(err){toast('No se han podido subir tus datos locales al servidor.')}
+ }
+ cacheLocally();
+ subscribeRealtime();
+ showView('home');renderHistory();
+}
+async function doLogin(){
+ const email=$('loginEmail').value.trim(),pass=$('loginPass').value;
+ $('loginError').textContent='';
+ if(!email||!pass){$('loginError').textContent='Introduce email y contraseña.';return}
+ const btn=$('loginBtn');btn.disabled=true;btn.textContent='Entrando…';
+ const {error}=await sb.auth.signInWithPassword({email,password:pass});
+ btn.disabled=false;btn.textContent='Entrar';
+ if(error){$('loginError').textContent='Email o contraseña incorrectos.';return}
+ await afterLogin();
+}
+$('loginBtn').addEventListener('click',doLogin);
+$('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+$('loginEmail').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginPass').focus()});
+$('logoutBtn').addEventListener('click',async()=>{
+ await sb.auth.signOut();
+ s=null;SQUAD=blankSquad();MATCHES=[];
+ $('loginEmail').value='';$('loginPass').value='';$('loginError').textContent='';
+ showView('login');
+});
+async function boot(){
+ migrateOld();
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){showView('login');return}
+  await afterLogin();
+ }catch(err){
+  showView('login');
+  $('loginError').textContent='No se ha podido conectar. Comprueba tu conexión e inténtalo de nuevo.';
+ }
+}
+boot();
+if('serviceWorker' in navigator){
+ window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})
+}
+})();
+</script>
+</body>
+</html>
+<style>.remove-player{border:0;background:#f3e7e7;color:#9a3f3f;border-radius:7px;min-height:34px;font-weight:900;padding:0 6px;font-size:9px}.remove-player:hover{background:#efd6d6}.roster-table-wrap{overflow:auto}.roster-table{width:100%;border-collapse:collapse}.roster-table th,.roster-table td{border:1px solid #d8dde2;padding:6px 7px;font-size:10px}.roster-table th{background:#f0f2f4}.roster-table td.name{text-align:left;font-weight:800}.chosen{background:#fff6ed}.panel-note{font-size:10px;color:#6f7780;margin:6px 0 0}</style>
