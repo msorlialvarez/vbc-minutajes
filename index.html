@@ -478,14 +478,20 @@ async function pushAllLocal(){
   await sb.from('matches').upsert(rows);
  }
 }
+function isTypingIn(containerId){
+ const el=document.activeElement;
+ if(!el||(el.tagName!=='INPUT'&&el.tagName!=='TEXTAREA'))return false;
+ const container=$(containerId);
+ return !!(container&&container.contains(el))
+}
 function subscribeRealtime(){
  if(realtimeReady)return;
  realtimeReady=true;
  sb.channel('squad-changes').on('postgres_changes',{event:'*',schema:'public',table:'squad'},payload=>{
   if(!payload.new||!payload.new.data)return;
   SQUAD=payload.new.data;cacheLocally();
-  if($('plantilla').style.display!=='none')renderPlantilla();
-  if(s)render();
+  if($('plantilla').style.display!=='none'&&!isTypingIn('plantillaRoster'))renderPlantilla();
+  if(s&&!isTypingIn('planner'))render();
  }).subscribe();
  sb.channel('matches-changes').on('postgres_changes',{event:'*',schema:'public',table:'matches'},payload=>{
   if(payload.eventType==='DELETE'){
@@ -501,8 +507,8 @@ function subscribeRealtime(){
   cacheLocally();
   if(s&&s.currentMatchId===incoming.id){
    s=JSON.parse(JSON.stringify(incoming));s.currentMatchId=incoming.id;
-   if($('planner').style.display!=='none')render();
-   else if($('live').style.display!=='none')renderLive();
+   if($('planner').style.display!=='none'){if(!isTypingIn('planner'))render()}
+   else if($('live').style.display!=='none'){if(!isTypingIn('live'))renderLive()}
   }
   if($('home').style.display!=='none')renderHistory();
  }).subscribe();
@@ -571,9 +577,12 @@ function renderSelectionTable(){
  host.querySelectorAll('[data-starget]').forEach(x=>x.addEventListener('click',e=>e.stopPropagation()));
  host.querySelectorAll('[data-starget]').forEach(x=>x.addEventListener('input',()=>{
    const i=+x.dataset.starget;let v=parseInt(x.value||0,10);if(!Number.isFinite(v))v=0;v=Math.max(0,Math.min(40,v));
-   s.roster[i].target=v;save();renderSummary();
+   s.roster[i].target=v;save();
    $('activeTargetTotal').textContent=s.roster.filter(p=>p.active!==false).reduce((a,p)=>a+(Number(p.target)||0),0)+"'";
+   clearTimeout(window._targetDebounce);
+   window._targetDebounce=setTimeout(()=>{if(!isTypingIn('selectionCards'))renderSummary()},600)
  }));
+ host.querySelectorAll('[data-starget]').forEach(x=>x.addEventListener('blur',()=>{clearTimeout(window._targetDebounce);renderSummary()}));
 }
 
 let ctx=null;
