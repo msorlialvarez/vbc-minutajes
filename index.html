@@ -221,6 +221,8 @@ input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padd
 .lf input{width:100%;padding:11px;border:2px solid #e3e6e9;border-radius:9px;font-size:14px;background:#fff}
 .lf input:focus{border-color:var(--o);outline:none}
 .login-error{color:var(--r);font-size:12px;margin-top:12px;min-height:14px;text-align:center}
+.toastbox{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#171a1e;color:#fff;padding:12px 18px;border-radius:10px;font-size:12px;font-weight:800;max-width:min(92vw,420px);box-shadow:0 8px 22px rgba(0,0,0,.28);z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s}
+.toastbox.show{opacity:1}
 .hero{padding:26px 10px 6px;text-align:center}
 .hero h1{margin:0;font-size:clamp(24px,4vw,40px);color:var(--ink)}
 .hero h1 span{color:var(--o)}
@@ -258,6 +260,7 @@ input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padd
 </head>
 <body>
 <div class="app" id="app">
+<div class="toastbox" id="toastBox"></div>
 <header>
  <div class="header">
   <div><h1>VALENCIA BASKET</h1><div class="sub">Planificación visual de minutajes, rotaciones y combinaciones</div></div>
@@ -442,7 +445,11 @@ function cacheLocally(){try{localStorage.setItem(SQUAD_KEY,JSON.stringify(SQUAD)
 function saveSquad(){
  lastSquadPushAt=Date.now();
  cacheLocally();
- sb.from('squad').upsert({id:'main',data:SQUAD,updated_at:new Date().toISOString()}).then(({error})=>{if(error)toast('No se ha podido guardar la plantilla en el servidor: '+error.message)})
+ clearTimeout(window._squadPushTimer);
+ window._squadPushTimer=setTimeout(()=>{
+  lastSquadPushAt=Date.now();
+  sb.from('squad').upsert({id:'main',data:SQUAD,updated_at:new Date().toISOString()}).then(({error})=>{if(error)toast('No se ha podido guardar la plantilla en el servidor: '+error.message)})
+ },500)
 }
 
 let SQUAD=blankSquad();
@@ -535,7 +542,13 @@ function valid(){return s.roster.filter(p=>p.active!==false&&p.number.trim()&&p.
 function gp(id){return s.roster.find(p=>p.number===id)}
 function lab(id){const p=gp(id);return p?`${p.number} · ${p.name}`:id||'—'}
 function lc(m){return m>32?'red':m>=28?'orange':m>=22?'yellow':m>=15?'green':'grey'}
-function toast(msg){alert(msg)}
+function toast(msg){
+ const el=$('toastBox');
+ if(!el){console.error(msg);return}
+ el.textContent=msg;el.classList.add('show');
+ clearTimeout(window._toastTimer);
+ window._toastTimer=setTimeout(()=>el.classList.remove('show'),4500)
+}
 function patchQuartersIds(quarters,old,v){quarters.forEach(q=>{q.start=q.start.map(z=>z===old?v:z);q.changes=q.changes.map(r=>r.map(z=>z===old?v:z))})}
 function patchAllIds(old,v){patchQuartersIds(s.quarters,old,v);if(s.live&&s.live.quarters)patchQuartersIds(s.live.quarters,old,v)}
 
@@ -990,7 +1003,9 @@ function render(){
  s.roster.forEach(p=>{if(p.target==null)p.target=0;if(p.active==null)p.active=true});$('rival').value=s.rival||'';$('competicion').value=s.competicion||'';$('fecha').value=s.fecha||'';$('notes').value=s.notes||'';
  renderQuarters();renderSummary();renderAnalysis();renderQuarterMinutes('quarterMinPlan',s.quarters)
 }
-$('rival').addEventListener('input',e=>{s.rival=e.target.value;save()});$('competicion').addEventListener('input',e=>{s.competicion=e.target.value;save()});$('fecha').addEventListener('change',e=>{s.fecha=e.target.value;save()});$('notes').addEventListener('input',e=>{s.notes=e.target.value;save()});
+function debounce(fn,ms){let t;return(...args)=>{clearTimeout(t);t=setTimeout(()=>fn(...args),ms)}}
+const debouncedSave=debounce(()=>save(),500);
+$('rival').addEventListener('input',e=>{s.rival=e.target.value;debouncedSave()});$('competicion').addEventListener('input',e=>{s.competicion=e.target.value;debouncedSave()});$('fecha').addEventListener('change',e=>{s.fecha=e.target.value;save()});$('notes').addEventListener('input',e=>{s.notes=e.target.value;debouncedSave()});
 $('closeModal').addEventListener('click',closePicker);$('modal').addEventListener('click',e=>{if(e.target.id==='modal')closePicker()});
 $('clearChange').addEventListener('click',()=>{
  if(!ctx||ctx.type!=='change')return;
