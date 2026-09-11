@@ -28,7 +28,8 @@ h1{margin:0;font-size:clamp(24px,3vw,42px)} h1 span{color:var(--o2)}
 .sub{color:#d7dbe0;margin-top:4px;font-size:14px}
 .motto{border:1px solid #555e66;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:900}
 main{padding:12px}
-.top{display:grid;grid-template-columns:1fr .75fr .65fr 1.2fr auto;gap:8px;align-items:end;margin-bottom:10px}
+.top{display:grid;grid-template-columns:1fr .8fr minmax(150px,.95fr) 1fr auto;gap:8px;align-items:end;margin-bottom:10px}
+.top>div{min-width:0}
 label{display:block;font-size:10px;font-weight:900;color:#59616a;margin-bottom:3px}
 input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padding:7px 9px;background:#fff;color:var(--ink)}
 .btn{border:0;border-radius:8px;padding:9px 12px;min-height:38px;background:#e7eaed;color:#20252a;font-weight:900}
@@ -393,7 +394,27 @@ input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padd
  </div>
  <div class="livewrap">
   <div class="tip"><strong>Cómo funciona:</strong> en cada puesto tienes 2 columnas: <span style="color:var(--r);font-weight:900">REAL</span> (pulsa para marcar quién entra de verdad) y <span style="font-weight:900">PLAN</span> (lo que tenías previsto, solo para comparar). Ninguna jugadora ya en pista en ese momento aparece como opción para evitar duplicados.</div>
-  <div id="liveGrid"></div>
+  <div class="layout">
+   <div id="liveGrid"></div>
+   <aside class="box side">
+    <div class="head orange"><h2>REPARTO CALCULADO · REAL</h2><strong id="liveStatus"></strong></div>
+    <div class="sumwrap">
+     <div id="liveSummaries"></div>
+     <div class="metrics">
+      <div class="metric"><strong id="liveTeamTotal">0</strong><span>MIN TOTALES</span></div>
+      <div class="metric"><strong id="liveMaxRun">0'</strong><span>MÁX SEGUIDO</span></div>
+      <div class="metric"><strong id="liveNQuintets">0</strong><span>QUINTETOS</span></div>
+     </div>
+     <div class="legend">
+      <span><i class="dot" style="background:var(--gry)"></i>&lt;15'</span>
+      <span><i class="dot" style="background:var(--g)"></i>15–22'</span>
+      <span><i class="dot" style="background:var(--y)"></i>22–28'</span>
+      <span><i class="dot" style="background:var(--or)"></i>28–32'</span>
+      <span><i class="dot" style="background:var(--r)"></i>&gt;32'</span>
+     </div>
+    </div>
+   </aside>
+  </div>
   <div class="box" style="margin-top:10px">
    <div class="head"><h3>MINUTOS: OBJETIVO · PLAN · REAL</h3></div>
    <div class="pb" style="overflow:auto"><table class="livetable" id="liveTable"></table></div>
@@ -733,21 +754,30 @@ function quintets(snaps){
 }
 function comboM(snaps,ids){return ids.length<2?0:snaps.filter(x=>ids.every(id=>x.lineup.includes(id))).length}
 
-function renderSummary(){
- const {snaps,errors}=plan(),m=metrics(snaps),h=$('summaries');h.innerHTML='';
+function renderMinutesPanel(quarters,ids,clickable){
+ const {snaps,errors}=plan(quarters),m=metrics(snaps),h=$(ids.summaries);h.innerHTML='';
  valid().forEach(p=>{
   const mins=m.tot[p.number]||0,t=Number(p.target)||0,d=mins-t;
   const el=document.createElement('div');el.className='ps '+lc(mins);
   const dt=!t?'Sin minutaje marcado':d===0?'Cuadra con lo marcado':`${d>0?'+':''}${d}' vs marcado`;
   const dc=!t?'':d===0?'ok':d>0?'more':'less';
   el.innerHTML=`<div class="pst"><div><div class="pn">#${esc(p.number)} ${esc(p.name)}</div><div class="meta">Marcado ${t}' · Máx seguido ${m.max[p.number]||0}'</div><div class="diff ${dc}">${dt}</div></div><div class="pm">${mins}'</div></div><div class="tl">${(m.tl[p.number]||[]).map((on,i)=>`<span class="${on?'on ':''}${[9,19,29,39].includes(i)?'sep':''}"></span>`).join('')}</div>`;
-  el.addEventListener('click',()=>{if(s.combo.includes(p.number))s.combo=s.combo.filter(z=>z!==p.number);else if(s.combo.length<5)s.combo.push(p.number);save();renderAnalysis()});
+  if(clickable)el.addEventListener('click',()=>{if(s.combo.includes(p.number))s.combo=s.combo.filter(z=>z!==p.number);else if(s.combo.length<5)s.combo.push(p.number);save();renderAnalysis()});
   h.appendChild(el)
  });
  const total=Object.values(m.tot).reduce((a,b)=>a+b,0),qs=quintets(snaps);
- $('teamTotal').textContent=total;$('maxRun').textContent=Math.max(0,...Object.values(m.max))+"'";$('nQuintets').textContent=qs.length;
- $('status').textContent=errors.length?'REVISAR':'PLAN OK';$('status').style.color=errors.length?'#ffd1d1':'#d8ffe7';$('status').title=errors.join('\n');
+ $(ids.teamTotal).textContent=total;$(ids.maxRun).textContent=Math.max(0,...Object.values(m.max))+"'";$(ids.nQuintets).textContent=qs.length;
+ $(ids.status).textContent=errors.length?'REVISAR':'PLAN OK';$(ids.status).style.color=errors.length?'#ffd1d1':'#d8ffe7';$(ids.status).title=errors.join('\n');
+ return{snaps,errors,m}
+}
+const PLAN_SUMMARY_IDS={summaries:'summaries',teamTotal:'teamTotal',maxRun:'maxRun',nQuintets:'nQuintets',status:'status'};
+const LIVE_SUMMARY_IDS={summaries:'liveSummaries',teamTotal:'liveTeamTotal',maxRun:'liveMaxRun',nQuintets:'liveNQuintets',status:'liveStatus'};
+function renderSummary(){
+ renderMinutesPanel(s.quarters,PLAN_SUMMARY_IDS,true);
  renderSelectionTable();
+}
+function renderLiveSummaryPanel(){
+ renderMinutesPanel(liveQuarters(),LIVE_SUMMARY_IDS,false);
 }
 function renderAnalysis(){
  const {snaps}=plan(),b=$('comboButtons');b.innerHTML='';
@@ -871,7 +901,7 @@ function renderLiveTable(){
 function renderLive(){
  ensureLive();
  $('liveMeta').textContent=[s.rival?`Rival: ${s.rival}`:'',s.fecha?`Fecha: ${s.fecha}`:''].filter(Boolean).join(' · ')||'Sin datos de partido';
- renderLiveGrid();renderLiveTable();renderQuarterMinutes('quarterMinLive',liveQuarters())
+ renderLiveGrid();renderLiveTable();renderQuarterMinutes('quarterMinLive',liveQuarters());renderLiveSummaryPanel()
 }
 $('liveReset').addEventListener('click',()=>{
  const b=$('liveReset');clearTimeout(b._t);
