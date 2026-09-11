@@ -440,12 +440,15 @@ function loadLocalSquadCache(){try{const x=JSON.parse(localStorage.getItem(SQUAD
 function loadLocalMatchesCache(){try{const x=JSON.parse(localStorage.getItem(MATCHES_KEY));return Array.isArray(x)?x:null}catch(e){return null}}
 function cacheLocally(){try{localStorage.setItem(SQUAD_KEY,JSON.stringify(SQUAD));localStorage.setItem(MATCHES_KEY,JSON.stringify(MATCHES))}catch(e){}}
 function saveSquad(){
+ lastSquadPushAt=Date.now();
  cacheLocally();
  sb.from('squad').upsert({id:'main',data:SQUAD,updated_at:new Date().toISOString()}).then(({error})=>{if(error)toast('No se ha podido guardar la plantilla en el servidor: '+error.message)})
 }
 
 let SQUAD=blankSquad();
 let MATCHES=[];
+let lastSquadPushAt=0;
+let lastMatchPushAt={};
 
 function migrateOld(){
  try{
@@ -484,11 +487,13 @@ function isTypingIn(containerId){
  const container=$(containerId);
  return !!(container&&container.contains(el))
 }
+const ECHO_COOLDOWN=5000;
 function subscribeRealtime(){
  if(realtimeReady)return;
  realtimeReady=true;
  sb.channel('squad-changes').on('postgres_changes',{event:'*',schema:'public',table:'squad'},payload=>{
   if(!payload.new||!payload.new.data)return;
+  if(Date.now()-lastSquadPushAt<ECHO_COOLDOWN)return;
   SQUAD=payload.new.data;cacheLocally();
   if($('plantilla').style.display!=='none'&&!isTypingIn('plantillaRoster'))renderPlantilla();
   if(s&&!isTypingIn('planner'))render();
@@ -502,6 +507,7 @@ function subscribeRealtime(){
    return;
   }
   const incoming=payload.new&&payload.new.data;if(!incoming)return;
+  if(Date.now()-(lastMatchPushAt[incoming.id]||0)<ECHO_COOLDOWN)return;
   const idx=MATCHES.findIndex(m=>m.id===incoming.id);
   if(idx>=0)MATCHES[idx]=incoming;else MATCHES.push(incoming);
   cacheLocally();
@@ -519,6 +525,7 @@ function save(){
   const idx=MATCHES.findIndex(m=>m.id===s.currentMatchId);
   const snap={id:s.currentMatchId,rival:s.rival||'',competicion:s.competicion||'',fecha:s.fecha||'',notes:s.notes||'',roster:s.roster,quarters:s.quarters,combo:s.combo,live:s.live,createdAt:idx>=0?MATCHES[idx].createdAt:Date.now(),updatedAt:Date.now()};
   if(idx>=0)MATCHES[idx]=snap;else MATCHES.push(snap);
+  lastMatchPushAt[snap.id]=Date.now();
   cacheLocally();
   sb.from('matches').upsert({id:snap.id,data:snap,updated_at:new Date().toISOString()}).then(({error})=>{if(error)toast('No se ha podido sincronizar el partido: '+error.message)});
  }
