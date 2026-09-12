@@ -875,11 +875,9 @@ async function downloadReportPdf(){
   const realSnaps=hasLive?realResult.snaps:[];
   const mReal=hasLive?metrics(realSnaps):null;
   const activeSnaps=hasLive?realSnaps:planSnaps;
-  const mActive=hasLive?mReal:mPlan;
   const players=valid();
   const byQPlan=quarterMinutes(s.quarters);
   const byQReal=hasLive?quarterMinutes(liveQuarters()):null;
-  const byQActive=hasLive?byQReal:byQPlan;
 
   // ===== CABECERA =====
   pdf.setFillColor(...C.ink);pdf.rect(0,0,PAGE_W,28,'F');
@@ -887,7 +885,7 @@ async function downloadReportPdf(){
   pdf.setTextColor(...C.orange);pdf.setFont('helvetica','bold');pdf.setFontSize(15);
   pdf.text('VALENCIA BASKET',M,12);
   pdf.setTextColor(...C.white);pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);
-  pdf.text('Informe postpartido'+(hasLive?'':' (aún sin datos en vivo — se muestra el plan)'),M,19);
+  pdf.text('Informe postpartido'+(hasLive?'':' (aún sin datos en vivo — Real y Diferencia en blanco)'),M,19);
   pdf.setFontSize(8.5);
   const metaParts=[];
   if(s.rival)metaParts.push('Rival: '+s.rival);
@@ -901,11 +899,11 @@ async function downloadReportPdf(){
   // ===== KPIs =====
   const totalPlan=Object.values(mPlan.tot).reduce((a,b)=>a+b,0);
   const totalReal=hasLive?Object.values(mReal.tot).reduce((a,b)=>a+b,0):null;
-  const vals=players.map(p=>({p,min:(mActive.tot[p.number])||0}));
+  const vals=players.map(p=>({p,min:(hasLive?mReal.tot[p.number]:mPlan.tot[p.number])||0}));
   const most=[...vals].sort((a,b)=>b.min-a.min)[0];
   const least=[...vals].sort((a,b)=>a.min-b.min)[0];
   const kpis=[
-   {label:'MIN. EQUIPO'+(hasLive?' REAL':''),value:(hasLive?totalReal:totalPlan)+"'"},
+   {label:'MIN. EQUIPO'+(hasLive?' REAL':' CALCULADO'),value:(hasLive?totalReal:totalPlan)+"'"},
    {label:'MÁS MINUTOS',value:most?pdfTruncate(most.p.name,14)+' '+most.min+"'":'—'},
    {label:'MENOS MINUTOS',value:least?pdfTruncate(least.p.name,14)+' '+least.min+"'":'—'},
    {label:'QUINTETOS',value:String(quintets(activeSnaps).length)}
@@ -913,94 +911,117 @@ async function downloadReportPdf(){
   const kpiGap=3.5,kpiW=(CW-3*kpiGap)/4;
   kpis.forEach((k,i)=>{
    const x=M+i*(kpiW+kpiGap);
-   pdf.setFillColor(...C.paper);pdf.roundedRect(x,y,kpiW,16,1.8,1.8,'F');
-   pdf.setDrawColor(...C.line);pdf.setLineWidth(0.2);pdf.roundedRect(x,y,kpiW,16,1.8,1.8,'S');
+   pdf.setFillColor(...C.paper);pdf.roundedRect(x,y,kpiW,15,1.8,1.8,'F');
+   pdf.setDrawColor(...C.line);pdf.setLineWidth(0.2);pdf.roundedRect(x,y,kpiW,15,1.8,1.8,'S');
    pdf.setTextColor(...C.muted);pdf.setFont('helvetica','bold');pdf.setFontSize(6.2);
-   pdf.text(k.label,x+2.5,y+5.5);
-   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);
-   pdf.text(String(k.value),x+2.5,y+12.5);
+   pdf.text(k.label,x+2.5,y+5.2);
+   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(9.2);
+   pdf.text(String(k.value),x+2.5,y+11.8);
   });
-  y+=16+7;
+  y+=15+6;
 
-  // ===== BARRAS: MINUTOS POR JUGADORA =====
+  // ===== REPARTO DE MINUTOS: OBJETIVO / CALCULADO / REAL / DIFERENCIA =====
   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);
-  pdf.text('MINUTOS POR JUGADORA'+(hasLive?'  (barra = real · marca = objetivo)':'  (barra = calculado · marca = objetivo)'),M,y);
-  y+=4.5;
-  const rowH=5.4,maxMin=40,nameW=32,minLabelW=10;
-  const barX=M+nameW,barW=CW-nameW-minLabelW;
-  const sortedPlayers=[...players].sort((a,b)=>(mActive.tot[b.number]||0)-(mActive.tot[a.number]||0));
-  sortedPlayers.forEach((p,i)=>{
-   const ry=y+i*rowH,mins=mActive.tot[p.number]||0,target=Number(p.target)||0;
-   pdf.setFont('helvetica','normal');pdf.setFontSize(7.3);pdf.setTextColor(...C.ink);
-   pdf.text(pdfTruncate(p.name,17),M,ry+3.6);
-   pdf.setFillColor(...C.paper);pdf.rect(barX,ry,barW,3.8,'F');
-   const w=Math.max(0,Math.min(barW,barW*mins/maxMin));
-   pdf.setFillColor(...pdfMinuteColor(mins));pdf.rect(barX,ry,w,3.8,'F');
-   if(target>0){
-    const tx=barX+Math.min(barW,barW*target/maxMin);
-    pdf.setDrawColor(...C.ink);pdf.setLineWidth(0.6);pdf.line(tx,ry-0.4,tx,ry+4.2);
-   }
-   pdf.setFont('helvetica','bold');pdf.setFontSize(7.3);pdf.setTextColor(...C.ink);
-   pdf.text(mins+"'",barX+barW+1.5,ry+3.6);
+  pdf.text('REPARTO DE MINUTOS',M,y);
+  y+=5;
+  const rmNumW=9,rmNameW=53,rmColW=(CW-rmNumW-rmNameW)/4,rmRowH=4.7;
+  pdf.setFillColor(...C.ink2);pdf.rect(M,y,CW,5,'F');
+  pdf.setTextColor(...C.white);pdf.setFont('helvetica','bold');pdf.setFontSize(6.3);
+  pdf.text('#',M+2,y+3.4);
+  pdf.text('JUGADORA',M+rmNumW+2,y+3.4);
+  ['OBJ.','CALC.','REAL','DIF.'].forEach((h,i)=>pdf.text(h,M+rmNumW+rmNameW+i*rmColW+rmColW/2,y+3.4,{align:'center'}));
+  y+=5;
+  const sortedByCalc=[...players].sort((a,b)=>(mPlan.tot[b.number]||0)-(mPlan.tot[a.number]||0));
+  sortedByCalc.forEach((p,i)=>{
+   const ry=y+i*rmRowH;
+   if(i%2===1){pdf.setFillColor(...C.paper);pdf.rect(M,ry,CW,rmRowH,'F')}
+   const obj=Number(p.target)||0,calc=mPlan.tot[p.number]||0,real=hasLive?(mReal.tot[p.number]||0):null;
+   const diff=hasLive?real-calc:null;
+   pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(...C.muted);
+   pdf.text(p.number,M+2,ry+3.3);
+   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','normal');
+   pdf.text(pdfTruncate(p.name,26),M+rmNumW+2,ry+3.3);
+   pdf.setFont('helvetica','bold');
+   pdf.text(obj+"'",M+rmNumW+rmNameW+rmColW/2,ry+3.3,{align:'center'});
+   pdf.text(calc+"'",M+rmNumW+rmNameW+rmColW+rmColW/2,ry+3.3,{align:'center'});
+   pdf.text(real===null?'—':real+"'",M+rmNumW+rmNameW+2*rmColW+rmColW/2,ry+3.3,{align:'center'});
+   const dCol=diff===null?C.muted:diff===0?C.green:diff>0?C.blue:C.red;
+   pdf.setTextColor(...dCol);
+   pdf.text(diff===null?'—':(diff>0?'+':'')+diff+"'",M+rmNumW+rmNameW+3*rmColW+rmColW/2,ry+3.3,{align:'center'});
   });
-  y+=sortedPlayers.length*rowH+7;
+  y+=sortedByCalc.length*rmRowH+7;
 
-  // ===== DOS COLUMNAS: HEATMAP + TOP QUINTETOS =====
-  const colGap=6,colW=(CW-colGap)/2,col1X=M,col2X=M+colW+colGap,sectionTop=y;
-
+  // ===== MINUTOS POR CUARTO: PLAN | REAL =====
+  const colGap=6,colW=(CW-colGap)/2,col1X=M,col2X=M+colW+colGap;
   pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(...C.ink);
-  pdf.text('MINUTOS POR CUARTO'+(hasLive?' · REAL':''),col1X,y);
-  let hy=y+5.5;
-  const hmNameW=24,hmCellW=(colW-hmNameW)/4,hmRowH=5;
-  pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...C.muted);
-  ['1Q','2Q','3Q','4Q'].forEach((lab,i)=>pdf.text(lab,col1X+hmNameW+i*hmCellW+hmCellW/2,hy,{align:'center'}));
-  hy+=2.6;
-  players.forEach(p=>{
-   pdf.setFont('helvetica','normal');pdf.setFontSize(6.6);pdf.setTextColor(...C.ink);
-   pdf.text(pdfTruncate(p.name,12),col1X,hy+3.5);
-   const qs=byQActive[p.number]||[0,0,0,0];
-   qs.forEach((m,i)=>{
-    const cx=col1X+hmNameW+i*hmCellW;
-    pdf.setFillColor(...pdfQuarterColor(m));pdf.rect(cx+0.3,hy,hmCellW-0.6,hmRowH-0.7,'F');
-    pdf.setFont('helvetica','bold');pdf.setFontSize(6.6);pdf.setTextColor(...C.ink);
-    pdf.text(String(m),cx+hmCellW/2,hy+3.4,{align:'center'});
+  pdf.text('MINUTOS POR CUARTO',M,y);
+  y+=5;
+  function drawQuarterHeatmap(x,title,byQ){
+   pdf.setFont('helvetica','bold');pdf.setFontSize(7.3);pdf.setTextColor(...C.muted);
+   pdf.text(title,x,y);
+   let hy=y+4;
+   const hmNameW=22,hmCellW=(colW-hmNameW)/4,hmRowH=4.7;
+   pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...C.muted);
+   ['1Q','2Q','3Q','4Q'].forEach((lab,i)=>pdf.text(lab,x+hmNameW+i*hmCellW+hmCellW/2,hy,{align:'center'}));
+   hy+=2.4;
+   players.forEach(p=>{
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.4);pdf.setTextColor(...C.ink);
+    pdf.text(pdfTruncate(p.name,11),x,hy+3.3);
+    const qs=(byQ&&byQ[p.number])||[0,0,0,0];
+    qs.forEach((m,i)=>{
+     const cx=x+hmNameW+i*hmCellW;
+     pdf.setFillColor(...(byQ?pdfQuarterColor(m):C.line));pdf.rect(cx+0.3,hy,hmCellW-0.6,hmRowH-0.7,'F');
+     pdf.setFont('helvetica','bold');pdf.setFontSize(6.4);pdf.setTextColor(...C.ink);
+     pdf.text(byQ?String(m):'—',cx+hmCellW/2,hy+3.2,{align:'center'});
+    });
+    hy+=hmRowH;
    });
-   hy+=hmRowH;
-  });
+   return hy
+  }
+  const hy1=drawQuarterHeatmap(col1X,'PLAN',byQPlan);
+  const hy2=drawQuarterHeatmap(col2X,'REAL'+(hasLive?'':' (sin datos)'),byQReal);
+  y=Math.max(hy1,hy2)+7;
 
+  // ===== TOP 5 QUINTETOS | COMBINACIONES DESTACADAS =====
   pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(...C.ink);
-  pdf.text('TOP QUINTETOS',col2X,y);
-  let qy=y+6.5;
-  const topQ=quintets(activeSnaps).slice(0,4);
+  pdf.text('TOP 5 QUINTETOS',col1X,y);
+  pdf.text('COMBINACIONES DESTACADAS',col2X,y);
+  let qy=y+6,cy=y+6;
+  const topQ=quintets(activeSnaps).slice(0,5);
   if(!topQ.length){
    pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(...C.muted);
-   pdf.text('Sin datos suficientes.',col2X,qy);
+   pdf.text('Sin datos suficientes.',col1X,qy);
+   qy+=6;
   }else{
    topQ.forEach((q,i)=>{
-    const names=pdfTruncate(q.ids.map(x=>gp(x)?.name||x).join(', '),52);
-    pdf.setFillColor(...C.paper);pdf.roundedRect(col2X,qy-3.8,colW,12.5,1.5,1.5,'F');
-    pdf.setFont('helvetica','bold');pdf.setFontSize(7.2);pdf.setTextColor(...C.ink);
-    pdf.text(`${i+1}. `+names,col2X+2.5,qy);
-    pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(...C.orange);
-    pdf.text(q.minutes+"'",col2X+colW-2.5,qy,{align:'right'});
-    pdf.setFont('helvetica','normal');pdf.setFontSize(6.3);pdf.setTextColor(...C.muted);
-    pdf.text(q.segments+(q.segments===1?' tramo':' tramos'),col2X+2.5,qy+4);
-    qy+=14;
+    const names=pdfTruncate(q.ids.map(x=>gp(x)?.name||x).join(', '),50);
+    pdf.setFillColor(...C.paper);pdf.roundedRect(col1X,qy-3.6,colW,10.6,1.5,1.5,'F');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(6.8);pdf.setTextColor(...C.ink);
+    pdf.text(`${i+1}. `+names,col1X+2.5,qy);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...C.orange);
+    pdf.text(q.minutes+"'",col1X+colW-2.5,qy,{align:'right'});
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(...C.muted);
+    pdf.text(q.segments+(q.segments===1?' tramo':' tramos'),col1X+2.5,qy+3.8);
+    qy+=11.6;
    });
   }
-  y=Math.max(hy,qy)+7;
-
-  // ===== PIE: PLAN VS REAL =====
-  if(hasLive){
-   pdf.setDrawColor(...C.line);pdf.setLineWidth(0.3);pdf.line(M,y,PAGE_W-M,y);
-   y+=6;
-   const diff=totalReal-totalPlan,dCol=diff===0?C.green:diff>0?C.blue:C.red;
-   pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(...C.ink);
-   pdf.text(`PLAN: ${totalPlan}'`,M,y);
-   pdf.text(`REAL: ${totalReal}'`,PAGE_W/2,y,{align:'center'});
-   pdf.setTextColor(...dCol);
-   pdf.text(`DIFERENCIA: ${diff>0?'+':''}${diff}'`,PAGE_W-M,y,{align:'right'});
+  const pairs=allPairs(activeSnaps).filter(x=>x.m>0).slice(0,8);
+  if(!pairs.length){
+   pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(...C.muted);
+   pdf.text('Sin datos suficientes.',col2X,cy);
+   cy+=6;
+  }else{
+   pairs.forEach(x=>{
+    const names=pdfTruncate(x.ids.map(id=>gp(id)?.name||id).join(' + '),34);
+    pdf.setFillColor(...C.paper);pdf.roundedRect(col2X,cy-3.3,colW,6.4,1.3,1.3,'F');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(6.8);pdf.setTextColor(...C.ink);
+    pdf.text(names,col2X+2.5,cy);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(7.3);pdf.setTextColor(...C.orange);
+    pdf.text(x.m+"'",col2X+colW-2.5,cy,{align:'right'});
+    cy+=7.4;
+   });
   }
+  y=Math.max(qy,cy);
 
   pdf.save(`Informe_Postpartido_VBC_${(s.rival||'partido').replace(/\s+/g,'_')}.pdf`);
  }catch(err){
