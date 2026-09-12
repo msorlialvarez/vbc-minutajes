@@ -45,12 +45,15 @@ input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padd
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;align-items:start}
 .qs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .q{border:2px solid #30353b;border-radius:10px;overflow:hidden}
+.qscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.start{min-width:460px}
+.grid{min-width:460px}
 .qh{background:var(--o);color:#fff;padding:7px 9px;display:flex;justify-content:space-between;align-items:center}
 .qh strong{font-size:18px}.qh span{font-size:10px;font-weight:900}
 .start{display:grid;grid-template-columns:74px repeat(5,1fr);border-bottom:2px solid #333}
 .startlabel{background:#ffe0c7;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:950}
 .pick{border:0;border-left:1px solid #c6cbd0;background:#fff;min-height:38px;font-weight:950;color:var(--blue);padding:3px}
-.pick small{display:block;color:#6f7780;font-size:8px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick small,.change small,.c small{display:block;color:#6f7780;font-size:8px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .grid{display:grid;grid-template-columns:46px repeat(5,1fr)}
 .c{min-height:34px;border-right:1px solid #d5d9dd;border-bottom:1px solid #d5d9dd;display:flex;align-items:center;justify-content:center}
 .c.m{background:#f0f2f4;font-weight:950}.c.h{background:#e1e5e8;font-size:10px;font-weight:900;min-height:27px}
@@ -179,8 +182,8 @@ input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padd
 .livemeta{font-size:11px;color:#c9ced3;margin-top:2px}
 .livewrap{border:1px solid var(--line);border-radius:0 0 11px 11px;border-top:0;background:#fff;padding:12px}
 .livewrap .q{margin-bottom:12px}
-.lstart{grid-template-columns:74px repeat(10,1fr)}
-.lgrid{grid-template-columns:46px repeat(10,1fr)}
+.lstart{grid-template-columns:74px repeat(10,1fr);min-width:820px}
+.lgrid{grid-template-columns:46px repeat(10,1fr);min-width:820px}
 .lgrid .c.h.realc{background:#ffe0c7}
 .lgrid .c.h.planc{background:#e1e5e8;color:#6f7780}
 .planc{background:#f7f8f9;color:#7c838b;cursor:default}
@@ -672,12 +675,13 @@ function renderQuarters(){
  s.quarters.forEach((q,qi)=>{
   const sec=document.createElement('section');sec.className='q';
   sec.innerHTML=`<div class="qh"><strong>Q${qi+1}</strong><span>QUINTETO INICIAL + CAMBIOS</span></div>`;
+  const scroll=document.createElement('div');scroll.className='qscroll';
   const sr=document.createElement('div');sr.className='start';sr.innerHTML='<div class="startlabel">INICIO</div>';
   q.start.forEach((id,c)=>{
    const b=document.createElement('button');b.type='button';b.className='pick';
    b.innerHTML=id?`#${esc(id)}<small>${esc(gp(id)?.name||'')}</small>`:'—';
    b.addEventListener('click',()=>openPicker({type:'start',q:qi,c}));sr.appendChild(b)
-  });sec.appendChild(sr);
+  });scroll.appendChild(sr);
   const grid=document.createElement('div');grid.className='grid';
   grid.innerHTML='<div class="c h">MIN</div>'+[1,2,3,4,5].map(n=>`<div class="c h">P${n}</div>`).join('');
   for(let min=9;min>=0;min--){
@@ -689,7 +693,7 @@ function renderQuarters(){
     b.addEventListener('click',()=>openPicker({type:'change',q:qi,r,c}));cell.appendChild(b);grid.appendChild(cell)
    }
   }
-  sec.appendChild(grid);h.appendChild(sec)
+  scroll.appendChild(grid);sec.appendChild(scroll);h.appendChild(sec)
  })
 }
 
@@ -904,8 +908,8 @@ async function downloadReportPdf(){
   const least=[...vals].sort((a,b)=>a.min-b.min)[0];
   const kpis=[
    {label:'MIN. EQUIPO'+(hasLive?' REAL':' CALCULADO'),value:(hasLive?totalReal:totalPlan)+"'"},
-   {label:'MÁS MINUTOS',value:most?pdfTruncate(most.p.name,14)+' '+most.min+"'":'—'},
-   {label:'MENOS MINUTOS',value:least?pdfTruncate(least.p.name,14)+' '+least.min+"'":'—'},
+   {label:'MÁS MINUTOS',value:most?most.p.name:'—',sub:most?most.min+"'":''},
+   {label:'MENOS MINUTOS',value:least?least.p.name:'—',sub:least?least.min+"'":''},
    {label:'QUINTETOS',value:String(quintets(activeSnaps).length)}
   ];
   const kpiGap=3.5,kpiW=(CW-3*kpiGap)/4;
@@ -913,18 +917,20 @@ async function downloadReportPdf(){
    const x=M+i*(kpiW+kpiGap);
    pdf.setFillColor(...C.paper);pdf.roundedRect(x,y,kpiW,15,1.8,1.8,'F');
    pdf.setDrawColor(...C.line);pdf.setLineWidth(0.2);pdf.roundedRect(x,y,kpiW,15,1.8,1.8,'S');
-   pdf.setTextColor(...C.muted);pdf.setFont('helvetica','bold');pdf.setFontSize(6.2);
-   pdf.text(k.label,x+2.5,y+5.2);
-   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(9.2);
-   pdf.text(String(k.value),x+2.5,y+11.8);
+   pdf.setTextColor(...C.muted);pdf.setFont('helvetica','bold');pdf.setFontSize(6);
+   pdf.text(k.label,x+2.5,y+5);
+   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(8);
+   const valLines=pdf.splitTextToSize(String(k.value),kpiW-5);
+   pdf.text(valLines.slice(0,2),x+2.5,y+10.2);
+   if(k.sub){pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(...C.orange);pdf.text(k.sub,x+2.5,y+15.2)}
   });
-  y+=15+6;
+  y+=15+5;
 
   // ===== REPARTO DE MINUTOS: OBJETIVO / CALCULADO / REAL / DIFERENCIA =====
   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);
   pdf.text('REPARTO DE MINUTOS',M,y);
   y+=5;
-  const rmNumW=9,rmNameW=53,rmColW=(CW-rmNumW-rmNameW)/4,rmRowH=4.7;
+  const rmNumW=8,rmNameW=64,rmColW=(CW-rmNumW-rmNameW)/4,rmRowH=4.6;
   pdf.setFillColor(...C.ink2);pdf.rect(M,y,CW,5,'F');
   pdf.setTextColor(...C.white);pdf.setFont('helvetica','bold');pdf.setFontSize(6.3);
   pdf.text('#',M+2,y+3.4);
@@ -938,18 +944,18 @@ async function downloadReportPdf(){
    const obj=Number(p.target)||0,calc=mPlan.tot[p.number]||0,real=hasLive?(mReal.tot[p.number]||0):null;
    const diff=hasLive?real-calc:null;
    pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(...C.muted);
-   pdf.text(p.number,M+2,ry+3.3);
-   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','normal');
-   pdf.text(pdfTruncate(p.name,26),M+rmNumW+2,ry+3.3);
-   pdf.setFont('helvetica','bold');
-   pdf.text(obj+"'",M+rmNumW+rmNameW+rmColW/2,ry+3.3,{align:'center'});
-   pdf.text(calc+"'",M+rmNumW+rmNameW+rmColW+rmColW/2,ry+3.3,{align:'center'});
-   pdf.text(real===null?'—':real+"'",M+rmNumW+rmNameW+2*rmColW+rmColW/2,ry+3.3,{align:'center'});
+   pdf.text(p.number,M+2,ry+3.4);
+   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','normal');pdf.setFontSize(7.2);
+   pdf.text(p.name,M+rmNumW+2,ry+3.4,{maxWidth:rmNameW-3});
+   pdf.setFont('helvetica','bold');pdf.setFontSize(7);
+   pdf.text(obj+"'",M+rmNumW+rmNameW+rmColW/2,ry+3.4,{align:'center'});
+   pdf.text(calc+"'",M+rmNumW+rmNameW+rmColW+rmColW/2,ry+3.4,{align:'center'});
+   pdf.text(real===null?'—':real+"'",M+rmNumW+rmNameW+2*rmColW+rmColW/2,ry+3.4,{align:'center'});
    const dCol=diff===null?C.muted:diff===0?C.green:diff>0?C.blue:C.red;
    pdf.setTextColor(...dCol);
-   pdf.text(diff===null?'—':(diff>0?'+':'')+diff+"'",M+rmNumW+rmNameW+3*rmColW+rmColW/2,ry+3.3,{align:'center'});
+   pdf.text(diff===null?'—':(diff>0?'+':'')+diff+"'",M+rmNumW+rmNameW+3*rmColW+rmColW/2,ry+3.4,{align:'center'});
   });
-  y+=sortedByCalc.length*rmRowH+7;
+  y+=sortedByCalc.length*rmRowH+6;
 
   // ===== MINUTOS POR CUARTO: PLAN | REAL =====
   const colGap=6,colW=(CW-colGap)/2,col1X=M,col2X=M+colW+colGap;
@@ -960,13 +966,13 @@ async function downloadReportPdf(){
    pdf.setFont('helvetica','bold');pdf.setFontSize(7.3);pdf.setTextColor(...C.muted);
    pdf.text(title,x,y);
    let hy=y+4;
-   const hmNameW=22,hmCellW=(colW-hmNameW)/4,hmRowH=4.7;
+   const hmNameW=34,hmCellW=(colW-hmNameW)/4,hmRowH=4.6;
    pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...C.muted);
    ['1Q','2Q','3Q','4Q'].forEach((lab,i)=>pdf.text(lab,x+hmNameW+i*hmCellW+hmCellW/2,hy,{align:'center'}));
    hy+=2.4;
    players.forEach(p=>{
-    pdf.setFont('helvetica','normal');pdf.setFontSize(6.4);pdf.setTextColor(...C.ink);
-    pdf.text(pdfTruncate(p.name,11),x,hy+3.3);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(5.8);pdf.setTextColor(...C.ink);
+    pdf.text(p.name,x,hy+3.3,{maxWidth:hmNameW-1.5});
     const qs=(byQ&&byQ[p.number])||[0,0,0,0];
     qs.forEach((m,i)=>{
      const cx=x+hmNameW+i*hmCellW;
@@ -980,7 +986,7 @@ async function downloadReportPdf(){
   }
   const hy1=drawQuarterHeatmap(col1X,'PLAN',byQPlan);
   const hy2=drawQuarterHeatmap(col2X,'REAL'+(hasLive?'':' (sin datos)'),byQReal);
-  y=Math.max(hy1,hy2)+7;
+  y=Math.max(hy1,hy2)+6;
 
   // ===== TOP 5 QUINTETOS | COMBINACIONES DESTACADAS =====
   pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(...C.ink);
@@ -994,15 +1000,18 @@ async function downloadReportPdf(){
    qy+=6;
   }else{
    topQ.forEach((q,i)=>{
-    const names=pdfTruncate(q.ids.map(x=>gp(x)?.name||x).join(', '),50);
-    pdf.setFillColor(...C.paper);pdf.roundedRect(col1X,qy-3.6,colW,10.6,1.5,1.5,'F');
-    pdf.setFont('helvetica','bold');pdf.setFontSize(6.8);pdf.setTextColor(...C.ink);
-    pdf.text(`${i+1}. `+names,col1X+2.5,qy);
+    const names=q.ids.map(x=>gp(x)?.name||x).join(', ');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(6.8);
+    const nameLines=pdf.splitTextToSize(`${i+1}. `+names,colW-17);
+    const cardH=nameLines.length>1?13.6:10.4;
+    pdf.setFillColor(...C.paper);pdf.roundedRect(col1X,qy-3.6,colW,cardH,1.5,1.5,'F');
+    pdf.setTextColor(...C.ink);
+    pdf.text(nameLines.slice(0,2),col1X+2.5,qy);
     pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...C.orange);
     pdf.text(q.minutes+"'",col1X+colW-2.5,qy,{align:'right'});
     pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(...C.muted);
-    pdf.text(q.segments+(q.segments===1?' tramo':' tramos'),col1X+2.5,qy+3.8);
-    qy+=11.6;
+    pdf.text(q.segments+(q.segments===1?' tramo':' tramos'),col1X+2.5,qy+(nameLines.length>1?7.2:3.8));
+    qy+=cardH+1;
    });
   }
   const pairs=allPairs(activeSnaps).filter(x=>x.m>0).slice(0,8);
@@ -1012,13 +1021,16 @@ async function downloadReportPdf(){
    cy+=6;
   }else{
    pairs.forEach(x=>{
-    const names=pdfTruncate(x.ids.map(id=>gp(id)?.name||id).join(' + '),34);
-    pdf.setFillColor(...C.paper);pdf.roundedRect(col2X,cy-3.3,colW,6.4,1.3,1.3,'F');
-    pdf.setFont('helvetica','bold');pdf.setFontSize(6.8);pdf.setTextColor(...C.ink);
-    pdf.text(names,col2X+2.5,cy);
+    const names=x.ids.map(id=>gp(id)?.name||id).join(' + ');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(6.8);
+    const nameLines=pdf.splitTextToSize(names,colW-17);
+    const cardH=nameLines.length>1?10.2:6.6;
+    pdf.setFillColor(...C.paper);pdf.roundedRect(col2X,cy-3.3,colW,cardH,1.3,1.3,'F');
+    pdf.setTextColor(...C.ink);
+    pdf.text(nameLines.slice(0,2),col2X+2.5,cy);
     pdf.setFont('helvetica','bold');pdf.setFontSize(7.3);pdf.setTextColor(...C.orange);
     pdf.text(x.m+"'",col2X+colW-2.5,cy,{align:'right'});
-    cy+=7.4;
+    cy+=cardH+1;
    });
   }
   y=Math.max(qy,cy);
@@ -1042,6 +1054,7 @@ function renderLiveGrid(){
  s.quarters.forEach((q,qi)=>{
   const sec=document.createElement('section');sec.className='q';
   sec.innerHTML=`<div class="qh"><strong>Q${qi+1}</strong><span>REAL vs PLAN</span></div>`;
+  const scroll=document.createElement('div');scroll.className='qscroll';
   const sr=document.createElement('div');sr.className='start lstart';sr.innerHTML='<div class="startlabel">INICIO</div>';
   for(let c=0;c<5;c++){
    const rb=document.createElement('button');rb.type='button';rb.className='pick realc';
@@ -1054,7 +1067,7 @@ function renderLiveGrid(){
    pd.innerHTML=pid?`#${esc(pid)}<small>${esc(gp(pid)?.name||'')}</small>`:'—';
    sr.appendChild(pd);
   }
-  sec.appendChild(sr);
+  scroll.appendChild(sr);
   const grid=document.createElement('div');grid.className='grid lgrid';
   let hd='<div class="c h">MIN</div>';
   for(let n=1;n<=5;n++)hd+=`<div class="c h realc">P${n} REAL</div><div class="c h planc">PLAN</div>`;
@@ -1075,7 +1088,7 @@ function renderLiveGrid(){
     grid.appendChild(pcell)
    }
   }
-  sec.appendChild(grid);h.appendChild(sec)
+  scroll.appendChild(grid);sec.appendChild(scroll);h.appendChild(sec)
  })
 }
 function renderLiveTable(){
