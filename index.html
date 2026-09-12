@@ -900,32 +900,6 @@ async function downloadReportPdf(){
 
   let y=37;
 
-  // ===== KPIs =====
-  const totalPlan=Object.values(mPlan.tot).reduce((a,b)=>a+b,0);
-  const totalReal=hasLive?Object.values(mReal.tot).reduce((a,b)=>a+b,0):null;
-  const vals=players.map(p=>({p,min:(hasLive?mReal.tot[p.number]:mPlan.tot[p.number])||0}));
-  const most=[...vals].sort((a,b)=>b.min-a.min)[0];
-  const least=[...vals].sort((a,b)=>a.min-b.min)[0];
-  const kpis=[
-   {label:'MIN. EQUIPO'+(hasLive?' REAL':' CALCULADO'),value:(hasLive?totalReal:totalPlan)+"'"},
-   {label:'MÁS MINUTOS',value:most?most.p.name:'—',sub:most?most.min+"'":''},
-   {label:'MENOS MINUTOS',value:least?least.p.name:'—',sub:least?least.min+"'":''},
-   {label:'QUINTETOS',value:String(quintets(activeSnaps).length)}
-  ];
-  const kpiGap=3.5,kpiW=(CW-3*kpiGap)/4;
-  kpis.forEach((k,i)=>{
-   const x=M+i*(kpiW+kpiGap);
-   pdf.setFillColor(...C.paper);pdf.roundedRect(x,y,kpiW,15,1.8,1.8,'F');
-   pdf.setDrawColor(...C.line);pdf.setLineWidth(0.2);pdf.roundedRect(x,y,kpiW,15,1.8,1.8,'S');
-   pdf.setTextColor(...C.muted);pdf.setFont('helvetica','bold');pdf.setFontSize(6);
-   pdf.text(k.label,x+2.5,y+5);
-   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(8);
-   const valLines=pdf.splitTextToSize(String(k.value),kpiW-5);
-   pdf.text(valLines.slice(0,2),x+2.5,y+10.2);
-   if(k.sub){pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(...C.orange);pdf.text(k.sub,x+2.5,y+15.2)}
-  });
-  y+=15+5;
-
   // ===== REPARTO DE MINUTOS: OBJETIVO / CALCULADO / REAL / DIFERENCIA =====
   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);
   pdf.text('REPARTO DE MINUTOS',M,y);
@@ -955,7 +929,7 @@ async function downloadReportPdf(){
    pdf.setTextColor(...dCol);
    pdf.text(diff===null?'—':(diff>0?'+':'')+diff+"'",M+rmNumW+rmNameW+3*rmColW+rmColW/2,ry+3.4,{align:'center'});
   });
-  y+=sortedByCalc.length*rmRowH+6;
+  y+=sortedByCalc.length*rmRowH+12;
 
   // ===== MINUTOS POR CUARTO: PLAN | REAL =====
   const colGap=6,colW=(CW-colGap)/2,col1X=M,col2X=M+colW+colGap;
@@ -986,7 +960,7 @@ async function downloadReportPdf(){
   }
   const hy1=drawQuarterHeatmap(col1X,'PLAN',byQPlan);
   const hy2=drawQuarterHeatmap(col2X,'REAL'+(hasLive?'':' (sin datos)'),byQReal);
-  y=Math.max(hy1,hy2)+6;
+  y=Math.max(hy1,hy2)+12;
 
   // ===== TOP 5 QUINTETOS | COMBINACIONES DESTACADAS =====
   pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(...C.ink);
