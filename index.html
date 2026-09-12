@@ -224,6 +224,7 @@ input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padd
 .login-error{color:var(--r);font-size:12px;margin-top:12px;min-height:14px;text-align:center}
 .toastbox{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#171a1e;color:#fff;padding:12px 18px;border-radius:10px;font-size:12px;font-weight:800;max-width:min(92vw,420px);box-shadow:0 8px 22px rgba(0,0,0,.28);z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s}
 .toastbox.show{opacity:1}
+.offlinebanner{display:flex;align-items:center;justify-content:center;gap:6px;background:#5a3a12;color:#ffe3b0;font-size:11px;font-weight:800;padding:8px 12px;text-align:center}
 .hero{padding:26px 10px 6px;text-align:center}
 .hero h1{margin:0;font-size:clamp(24px,4vw,40px);color:var(--ink)}
 .hero h1 span{color:var(--o)}
@@ -262,6 +263,7 @@ input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padd
 <body>
 <div class="app" id="app">
 <div class="toastbox" id="toastBox"></div>
+<div class="offlinebanner" id="offlineBanner" style="display:none">📴 Sin conexión — sigues pudiendo ver y marcar cambios, se sincronizarán solos al recuperar internet.</div>
 <header>
  <div class="header">
   <div><h1>VALENCIA BASKET</h1><div class="sub">Planificación visual de minutajes, rotaciones y combinaciones</div></div>
@@ -1210,6 +1212,20 @@ async function boot(){
  }
 }
 boot();
+function updateOfflineBanner(){
+ const el=$('offlineBanner');if(!el)return;
+ el.style.display=navigator.onLine?'none':'flex'
+}
+async function resyncPending(){
+ try{
+  if(SQUAD.roster&&SQUAD.roster.length)await sb.from('squad').upsert({id:'main',data:SQUAD,updated_at:new Date().toISOString()});
+  if(s&&s.currentMatchId)save();
+  toast('Conexión recuperada: datos sincronizados.')
+ }catch(err){}
+}
+window.addEventListener('offline',updateOfflineBanner);
+window.addEventListener('online',()=>{updateOfflineBanner();resyncPending()});
+updateOfflineBanner();
 if('serviceWorker' in navigator){
  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})
 }
