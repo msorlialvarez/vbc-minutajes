@@ -13,7 +13,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="VBC Minutajes">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
@@ -85,9 +84,6 @@ input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padd
 @media(max-width:820px){.layout{grid-template-columns:1fr}.side{position:static}.sumwrap{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}.ps{margin:0}.metrics,.legend{grid-column:1/-1}}
 @media(max-width:850px){.analysis,.report-grid{grid-template-columns:1fr}.roster{grid-template-columns:repeat(3,1fr)}.top{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){main{padding:7px}.roster{grid-template-columns:repeat(2,1fr)}.modalgrid{grid-template-columns:repeat(2,1fr)}}
-.pdf-capture .no-print{display:none!important}
-.pdf-capture.report{max-width:820px;margin:0 auto}
-.pdf-capture .report-grid{grid-template-columns:1fr}
 </style>
 
 <style>
@@ -854,33 +850,162 @@ function buildReport(){
   $('reportQuarterCompare').innerHTML=qt
  }
 }
+const PDF_COLORS={
+ ink:[23,26,30],ink2:[37,42,48],orange:[244,119,33],white:[255,255,255],
+ grey:[187,193,199],green:[77,166,109],yellow:[242,201,76],darkorange:[237,139,47],red:[217,83,79],
+ line:[216,221,226],muted:[112,121,131],paper:[243,245,247],blue:[46,95,168]
+};
+function pdfMinuteColor(m){const C=PDF_COLORS;return m>32?C.red:m>=28?C.darkorange:m>=22?C.yellow:m>=15?C.green:C.grey}
+function pdfQuarterColor(m){const C=PDF_COLORS;return m<=2?C.red:m<=4?C.darkorange:m<=6?C.yellow:C.green}
+function pdfTruncate(str,max){return str&&str.length>max?str.slice(0,max-1)+'…':(str||'')}
+
 async function downloadReportPdf(){
  buildReport();
- const btn=$('downloadPdf'),prevText=btn.textContent,reportEl=$('report');
+ const btn=$('downloadPdf'),prevText=btn.textContent;
  btn.disabled=true;btn.textContent='Generando PDF…';
- reportEl.classList.add('pdf-capture');
- await new Promise(r=>setTimeout(r,50));
+ await new Promise(r=>setTimeout(r,30));
  try{
-  const canvas=await html2canvas(reportEl,{scale:2,backgroundColor:'#ffffff',useCORS:true});
-  const imgData=canvas.toDataURL('image/jpeg',0.95);
   const {jsPDF}=window.jspdf;
   const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-  const pageW=pdf.internal.pageSize.getWidth(),pageH=pdf.internal.pageSize.getHeight();
-  const imgW=pageW,imgH=canvas.height*imgW/canvas.width;
-  let heightLeft=imgH,position=0;
-  pdf.addImage(imgData,'JPEG',0,position,imgW,imgH);
-  heightLeft-=pageH;
-  while(heightLeft>0){
-   position=heightLeft-imgH;
-   pdf.addPage('a4','portrait');
-   pdf.addImage(imgData,'JPEG',0,position,imgW,imgH);
-   heightLeft-=pageH;
+  const C=PDF_COLORS,PAGE_W=210,M=11,CW=PAGE_W-2*M;
+
+  const hasLive=s.live&&s.live.quarters;
+  const {snaps:planSnaps}=plan(s.quarters),mPlan=metrics(planSnaps);
+  const realResult=hasLive?plan(liveQuarters()):null;
+  const realSnaps=hasLive?realResult.snaps:[];
+  const mReal=hasLive?metrics(realSnaps):null;
+  const activeSnaps=hasLive?realSnaps:planSnaps;
+  const mActive=hasLive?mReal:mPlan;
+  const players=valid();
+  const byQPlan=quarterMinutes(s.quarters);
+  const byQReal=hasLive?quarterMinutes(liveQuarters()):null;
+  const byQActive=hasLive?byQReal:byQPlan;
+
+  // ===== CABECERA =====
+  pdf.setFillColor(...C.ink);pdf.rect(0,0,PAGE_W,28,'F');
+  pdf.setFillColor(...C.orange);pdf.rect(0,28,PAGE_W,1.6,'F');
+  pdf.setTextColor(...C.orange);pdf.setFont('helvetica','bold');pdf.setFontSize(15);
+  pdf.text('VALENCIA BASKET',M,12);
+  pdf.setTextColor(...C.white);pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);
+  pdf.text('Informe postpartido'+(hasLive?'':' (aún sin datos en vivo — se muestra el plan)'),M,19);
+  pdf.setFontSize(8.5);
+  const metaParts=[];
+  if(s.rival)metaParts.push('Rival: '+s.rival);
+  if(s.fecha)metaParts.push('Fecha: '+s.fecha);
+  if(s.competicion)metaParts.push(s.competicion);
+  if(s.notes)metaParts.push('Jornada: '+s.notes);
+  pdf.text(metaParts.join('   ·   ')||' ',PAGE_W-M,12,{align:'right'});
+
+  let y=37;
+
+  // ===== KPIs =====
+  const totalPlan=Object.values(mPlan.tot).reduce((a,b)=>a+b,0);
+  const totalReal=hasLive?Object.values(mReal.tot).reduce((a,b)=>a+b,0):null;
+  const vals=players.map(p=>({p,min:(mActive.tot[p.number])||0}));
+  const most=[...vals].sort((a,b)=>b.min-a.min)[0];
+  const least=[...vals].sort((a,b)=>a.min-b.min)[0];
+  const kpis=[
+   {label:'MIN. EQUIPO'+(hasLive?' REAL':''),value:(hasLive?totalReal:totalPlan)+"'"},
+   {label:'MÁS MINUTOS',value:most?pdfTruncate(most.p.name,14)+' '+most.min+"'":'—'},
+   {label:'MENOS MINUTOS',value:least?pdfTruncate(least.p.name,14)+' '+least.min+"'":'—'},
+   {label:'QUINTETOS',value:String(quintets(activeSnaps).length)}
+  ];
+  const kpiGap=3.5,kpiW=(CW-3*kpiGap)/4;
+  kpis.forEach((k,i)=>{
+   const x=M+i*(kpiW+kpiGap);
+   pdf.setFillColor(...C.paper);pdf.roundedRect(x,y,kpiW,16,1.8,1.8,'F');
+   pdf.setDrawColor(...C.line);pdf.setLineWidth(0.2);pdf.roundedRect(x,y,kpiW,16,1.8,1.8,'S');
+   pdf.setTextColor(...C.muted);pdf.setFont('helvetica','bold');pdf.setFontSize(6.2);
+   pdf.text(k.label,x+2.5,y+5.5);
+   pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);
+   pdf.text(String(k.value),x+2.5,y+12.5);
+  });
+  y+=16+7;
+
+  // ===== BARRAS: MINUTOS POR JUGADORA =====
+  pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);
+  pdf.text('MINUTOS POR JUGADORA'+(hasLive?'  (barra = real · marca = objetivo)':'  (barra = calculado · marca = objetivo)'),M,y);
+  y+=4.5;
+  const rowH=5.4,maxMin=40,nameW=32,minLabelW=10;
+  const barX=M+nameW,barW=CW-nameW-minLabelW;
+  const sortedPlayers=[...players].sort((a,b)=>(mActive.tot[b.number]||0)-(mActive.tot[a.number]||0));
+  sortedPlayers.forEach((p,i)=>{
+   const ry=y+i*rowH,mins=mActive.tot[p.number]||0,target=Number(p.target)||0;
+   pdf.setFont('helvetica','normal');pdf.setFontSize(7.3);pdf.setTextColor(...C.ink);
+   pdf.text(pdfTruncate(p.name,17),M,ry+3.6);
+   pdf.setFillColor(...C.paper);pdf.rect(barX,ry,barW,3.8,'F');
+   const w=Math.max(0,Math.min(barW,barW*mins/maxMin));
+   pdf.setFillColor(...pdfMinuteColor(mins));pdf.rect(barX,ry,w,3.8,'F');
+   if(target>0){
+    const tx=barX+Math.min(barW,barW*target/maxMin);
+    pdf.setDrawColor(...C.ink);pdf.setLineWidth(0.6);pdf.line(tx,ry-0.4,tx,ry+4.2);
+   }
+   pdf.setFont('helvetica','bold');pdf.setFontSize(7.3);pdf.setTextColor(...C.ink);
+   pdf.text(mins+"'",barX+barW+1.5,ry+3.6);
+  });
+  y+=sortedPlayers.length*rowH+7;
+
+  // ===== DOS COLUMNAS: HEATMAP + TOP QUINTETOS =====
+  const colGap=6,colW=(CW-colGap)/2,col1X=M,col2X=M+colW+colGap,sectionTop=y;
+
+  pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(...C.ink);
+  pdf.text('MINUTOS POR CUARTO'+(hasLive?' · REAL':''),col1X,y);
+  let hy=y+5.5;
+  const hmNameW=24,hmCellW=(colW-hmNameW)/4,hmRowH=5;
+  pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...C.muted);
+  ['1Q','2Q','3Q','4Q'].forEach((lab,i)=>pdf.text(lab,col1X+hmNameW+i*hmCellW+hmCellW/2,hy,{align:'center'}));
+  hy+=2.6;
+  players.forEach(p=>{
+   pdf.setFont('helvetica','normal');pdf.setFontSize(6.6);pdf.setTextColor(...C.ink);
+   pdf.text(pdfTruncate(p.name,12),col1X,hy+3.5);
+   const qs=byQActive[p.number]||[0,0,0,0];
+   qs.forEach((m,i)=>{
+    const cx=col1X+hmNameW+i*hmCellW;
+    pdf.setFillColor(...pdfQuarterColor(m));pdf.rect(cx+0.3,hy,hmCellW-0.6,hmRowH-0.7,'F');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(6.6);pdf.setTextColor(...C.ink);
+    pdf.text(String(m),cx+hmCellW/2,hy+3.4,{align:'center'});
+   });
+   hy+=hmRowH;
+  });
+
+  pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(...C.ink);
+  pdf.text('TOP QUINTETOS',col2X,y);
+  let qy=y+6.5;
+  const topQ=quintets(activeSnaps).slice(0,4);
+  if(!topQ.length){
+   pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(...C.muted);
+   pdf.text('Sin datos suficientes.',col2X,qy);
+  }else{
+   topQ.forEach((q,i)=>{
+    const names=pdfTruncate(q.ids.map(x=>gp(x)?.name||x).join(', '),52);
+    pdf.setFillColor(...C.paper);pdf.roundedRect(col2X,qy-3.8,colW,12.5,1.5,1.5,'F');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(7.2);pdf.setTextColor(...C.ink);
+    pdf.text(`${i+1}. `+names,col2X+2.5,qy);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(...C.orange);
+    pdf.text(q.minutes+"'",col2X+colW-2.5,qy,{align:'right'});
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.3);pdf.setTextColor(...C.muted);
+    pdf.text(q.segments+(q.segments===1?' tramo':' tramos'),col2X+2.5,qy+4);
+    qy+=14;
+   });
   }
+  y=Math.max(hy,qy)+7;
+
+  // ===== PIE: PLAN VS REAL =====
+  if(hasLive){
+   pdf.setDrawColor(...C.line);pdf.setLineWidth(0.3);pdf.line(M,y,PAGE_W-M,y);
+   y+=6;
+   const diff=totalReal-totalPlan,dCol=diff===0?C.green:diff>0?C.blue:C.red;
+   pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(...C.ink);
+   pdf.text(`PLAN: ${totalPlan}'`,M,y);
+   pdf.text(`REAL: ${totalReal}'`,PAGE_W/2,y,{align:'center'});
+   pdf.setTextColor(...dCol);
+   pdf.text(`DIFERENCIA: ${diff>0?'+':''}${diff}'`,PAGE_W-M,y,{align:'right'});
+  }
+
   pdf.save(`Informe_Postpartido_VBC_${(s.rival||'partido').replace(/\s+/g,'_')}.pdf`);
  }catch(err){
   toast('No se ha podido generar el PDF: '+err.message);
  }finally{
-  reportEl.classList.remove('pdf-capture');
   btn.disabled=false;btn.textContent=prevText;
  }
 }
