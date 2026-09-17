@@ -574,7 +574,8 @@ function save(){
  }
 }
 function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function valid(){return s.roster.filter(p=>p.active!==false&&p.number.trim()&&p.name.trim())}
+function byNumber(a,b){return String(a.number).localeCompare(String(b.number),undefined,{numeric:true})}
+function valid(){return s.roster.filter(p=>p.active!==false&&p.number.trim()&&p.name.trim()).sort(byNumber)}
 function gp(id){return s.roster.find(p=>p.number===id)}
 function lab(id){const p=gp(id);return p?`${p.number} · ${p.name}`:id||'—'}
 function lc(m){return m>32?'red':m>=28?'orange':m>=22?'yellow':m>=15?'green':'grey'}
@@ -592,7 +593,9 @@ function renderSelectionTable(){
  const host=$('selectionCards');
  host.innerHTML='';
  let activeCount=0,activeTotal=0;
- s.roster.forEach((p,i)=>{
+ const order=s.roster.map((p,i)=>i).sort((a,b)=>byNumber(s.roster[a],s.roster[b]));
+ order.forEach(i=>{
+   const p=s.roster[i];
    if(p.active==null)p.active=true;
    if(p.active!==false){activeCount++;activeTotal+=Number(p.target)||0}
    const card=document.createElement('div');
@@ -772,7 +775,8 @@ function comboM(snaps,ids){return ids.length<2?0:snaps.filter(x=>ids.every(id=>x
 
 function renderMinutesPanel(quarters,ids,clickable){
  const {snaps,errors}=plan(quarters),m=metrics(snaps),h=$(ids.summaries);h.innerHTML='';
- valid().forEach(p=>{
+ const sortedByMinutes=[...valid()].sort((a,b)=>(m.tot[b.number]||0)-(m.tot[a.number]||0));
+ sortedByMinutes.forEach(p=>{
   const mins=m.tot[p.number]||0,t=Number(p.target)||0,d=mins-t;
   const el=document.createElement('div');el.className='ps '+lc(mins);
   const dt=!t?'Sin minutaje marcado':d===0?'Cuadra con lo marcado':`${d>0?'+':''}${d}' vs marcado`;
@@ -1390,7 +1394,9 @@ $('liveHome').addEventListener('click',()=>{showView('home');renderHistory()});
 /* ===== PLANTILLA (maestra) ===== */
 function renderPlantilla(){
  const h=$('plantillaRoster');h.innerHTML='';
- SQUAD.roster.forEach((p,i)=>{
+ const order=SQUAD.roster.map((p,i)=>i).sort((a,b)=>byNumber(SQUAD.roster[a],SQUAD.roster[b]));
+ order.forEach(i=>{
+  const p=SQUAD.roster[i];
   const d=document.createElement('div');d.className='pcard';
   d.innerHTML=`<div class="pnum"><input data-pnum="${i}" aria-label="Dorsal" inputmode="numeric" value="${esc(p.number)}"></div><div class="pname"><input data-pname="${i}" aria-label="Nombre" placeholder="Nombre de la jugadora" value="${esc(p.name)}"></div><button type="button" class="premove" data-premove="${i}" title="Eliminar de la plantilla">✕</button>`;
   h.appendChild(d)
@@ -1398,7 +1404,7 @@ function renderPlantilla(){
  h.querySelectorAll('[data-pnum]').forEach(x=>x.addEventListener('change',()=>{
   const i=+x.dataset.pnum,old=SQUAD.roster[i].number,v=x.value.trim();
   if(v&&SQUAD.roster.some((p,j)=>j!==i&&p.number===v)){toast('Ese dorsal ya está utilizado');x.value=old;return}
-  SQUAD.roster[i].number=v;saveSquad()
+  SQUAD.roster[i].number=v;saveSquad();renderPlantilla()
  }));
  h.querySelectorAll('[data-pname]').forEach(x=>x.addEventListener('input',()=>{SQUAD.roster[+x.dataset.pname].name=x.value;saveSquad()}));
  h.querySelectorAll('[data-premove]').forEach(x=>x.addEventListener('click',()=>{
