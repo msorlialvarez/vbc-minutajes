@@ -766,10 +766,13 @@ function quintets(snaps){
  snaps.forEach((x,idx)=>{
   if(x.lineup.filter(Boolean).length!==5||new Set(x.lineup).size!==5)return;
   const ids=[...x.lineup].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true})),key=ids.join('|');
-  if(!map.has(key))map.set(key,{ids,minutes:0,segments:0,last:-2});
+  if(!map.has(key))map.set(key,{ids,minutes:0,segments:0,last:-2,firstIdx:idx});
   const o=map.get(key);o.minutes++;if(o.last!==idx-1)o.segments++;o.last=idx
  });
  return[...map.values()].sort((a,b)=>b.minutes-a.minutes||b.segments-a.segments)
+}
+function topQuintets(snaps,n){
+ return quintets(snaps).slice(0,n).sort((a,b)=>a.firstIdx-b.firstIdx)
 }
 function comboM(snaps,ids){return ids.length<2?0:snaps.filter(x=>ids.every(id=>x.lineup.includes(id))).length}
 
@@ -807,7 +810,7 @@ function renderAnalysis(){
  });
  $('comboWho').textContent=s.combo.length>=2?s.combo.map(lab).join(' + '):'Selecciona al menos 2 jugadoras';
  $('comboVal').textContent=s.combo.length>=2?comboM(snaps,s.combo)+"'":'—';
- const top=quintets(snaps).slice(0,5),h=$('top5');h.innerHTML='';
+ const top=topQuintets(snaps,5),h=$('top5');h.innerHTML='';
  if(!top.length)h.innerHTML='<div class="meta">Completa la planificación para ver quintetos.</div>';
  top.forEach((q,i)=>{const d=document.createElement('div');d.className='qrow';d.innerHTML=`<div class="qrowtop"><div class="nums">${i+1}. ${q.ids.map(x=>'#'+esc(x)).join(' · ')}</div><div class="mins">${q.minutes}'</div></div><div class="names">${esc(q.ids.map(x=>gp(x)?.name||x).join(' · '))}</div><div class="segments">${q.segments} ${q.segments===1?'tramo':'tramos'}</div>`;h.appendChild(d)})
 }
@@ -827,7 +830,7 @@ function rotationRows(){
  return rows
 }
 function buildReport(){
- const {snaps,errors}=plan(),m=metrics(snaps),qs=quintets(snaps).slice(0,5),pairs=allPairs(snaps).slice(0,10);
+ const {snaps,errors}=plan(),m=metrics(snaps),qs=topQuintets(snaps,5),pairs=allPairs(snaps).slice(0,10);
  const hasLive=s.live&&s.live.quarters;
  const mReal=hasLive?metrics(plan(liveQuarters()).snaps):null;
  $('reportMeta').textContent=[s.rival?`Rival: ${s.rival}`:'',s.fecha?`Fecha: ${s.fecha}`:'',s.notes?`Jornada: ${s.notes}`:''].filter(Boolean).join(' · ');
@@ -974,7 +977,7 @@ async function downloadReportPdf(){
   pdf.text('TOP 5 QUINTETOS',col1X,y);
   pdf.text('COMBINACIONES DESTACADAS',col2X,y);
   let qy=y+6,cy=y+6;
-  const topQ=quintets(activeSnaps).slice(0,5);
+  const topQ=topQuintets(activeSnaps,5);
   if(!topQ.length){
    pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(...C.muted);
    pdf.text('Sin datos suficientes.',col1X,qy);
@@ -1033,50 +1036,59 @@ function drawPlanQuarterBlock(pdf,x,y,w,qi,q,C,rowH){
  pdf.setFont('helvetica','normal');pdf.setFontSize(6);
  pdf.text('QUINTETO INICIAL + CAMBIOS',x+w-2,y+3.8,{align:'right'});
  let ry=y+5.4;
+ const gridTop=ry;
 
- function cellBorder(cx,cy,cw,ch){pdf.setDrawColor(...C.line);pdf.setLineWidth(.2);pdf.rect(cx,cy,cw,ch,'S')}
- function cell(cx,cy,cw,ch,id){
-  cellBorder(cx,cy,cw,ch);
+ // posiciones x de las 6 líneas verticales (borde izq., tras MIN, tras P1..P5)
+ const colX=[x,x+minColW];
+ for(let c=1;c<=5;c++)colX.push(x+minColW+c*posColW);
+
+ function cellText(cx,cw,cyTop,ch,id){
   if(!id)return;
   const p=gp(id);
   pdf.setFont('helvetica','bold');pdf.setFontSize(ch>=6.8?7:6.4);pdf.setTextColor(...C.blue);
-  pdf.text('#'+id,cx+cw/2,cy+ch*0.46,{align:'center'});
+  pdf.text('#'+id,cx+cw/2,cyTop+ch*0.46,{align:'center'});
   pdf.setFont('helvetica','normal');pdf.setFontSize(ch>=6.8?4.6:4.1);pdf.setTextColor(...C.muted);
-  pdf.text(pdfTruncate(p?p.name:'',13),cx+cw/2,cy+ch*0.9,{align:'center'});
+  pdf.text(pdfTruncate(p?p.name:'',13),cx+cw/2,cyTop+ch*0.9,{align:'center'});
  }
 
- // cabecera MIN / P1..P5
+ // cabecera MIN / P1..P5 (solo relleno + texto; las líneas se dibujan todas juntas al final)
  pdf.setFillColor(...C.headerGrey);pdf.rect(x,ry,w,hdrH,'F');
  pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(6);
- cellBorder(x,ry,minColW,hdrH);
  pdf.text('MIN',x+minColW/2,ry+3,{align:'center'});
- for(let c=0;c<5;c++){
-  const cx=x+minColW+c*posColW;
-  cellBorder(cx,ry,posColW,hdrH);
-  pdf.text('P'+(c+1),cx+posColW/2,ry+3,{align:'center'});
- }
+ for(let c=0;c<5;c++)pdf.text('P'+(c+1),colX[c+1]+posColW/2,ry+3,{align:'center'});
  ry+=hdrH;
 
  // fila INICIO
  pdf.setFillColor(...C.startBg);pdf.rect(x,ry,minColW,rowH,'F');
- cellBorder(x,ry,minColW,rowH);
  pdf.setFont('helvetica','bold');pdf.setFontSize(5.6);pdf.setTextColor(...C.ink);
  pdf.text('INICIO',x+minColW/2,ry+rowH/2+1,{align:'center'});
- q.start.forEach((id,c)=>{cell(x+minColW+c*posColW,ry,posColW,rowH,id)});
+ q.start.forEach((id,c)=>cellText(colX[c+1],posColW,ry,rowH,id));
  ry+=rowH;
 
  // filas de minutos
  for(let min=9;min>=0;min--){
   const r=9-min;
   pdf.setFillColor(...C.minBg);pdf.rect(x,ry,minColW,rowH,'F');
-  cellBorder(x,ry,minColW,rowH);
   pdf.setFont('helvetica','bold');pdf.setFontSize(6.5);pdf.setTextColor(...C.ink);
   pdf.text(String(min),x+minColW/2,ry+rowH/2+1,{align:'center'});
-  for(let c=0;c<5;c++)cell(x+minColW+c*posColW,ry,posColW,rowH,q.changes[r][c]);
+  for(let c=0;c<5;c++)cellText(colX[c+1],posColW,ry,rowH,q.changes[r][c]);
   ry+=rowH;
  }
- pdf.setDrawColor(...C.line);pdf.setLineWidth(.3);pdf.rect(x,y+5.4,w,ry-(y+5.4),'S');
- return ry;
+ const gridBottom=ry;
+
+ // líneas de la cuadrícula: cada una se dibuja UNA sola vez, de punta a punta,
+ // para que ninguna fila (ni la de INICIO) pueda quedar descuadrada respecto a las demás
+ pdf.setDrawColor(...C.line);pdf.setLineWidth(.2);
+ let hy=gridTop;
+ pdf.line(x,hy,x+w,hy);
+ hy+=hdrH;pdf.line(x,hy,x+w,hy);
+ hy+=rowH;pdf.line(x,hy,x+w,hy);
+ for(let i=0;i<10;i++){hy+=rowH;pdf.line(x,hy,x+w,hy)}
+ colX.forEach(cx=>pdf.line(cx,gridTop,cx,gridBottom));
+
+ // marco exterior, encima de todo
+ pdf.setDrawColor(...C.line);pdf.setLineWidth(.3);pdf.rect(x,gridTop,w,gridBottom-gridTop,'S');
+ return gridBottom;
 }
 
 async function downloadPlanPdfLandscape(){
