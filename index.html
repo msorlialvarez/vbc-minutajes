@@ -327,6 +327,8 @@ input{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8px;padd
    <button class="btn" id="plannerHome">🏠 Inicio</button>
    <button class="btn dark" id="saveJson">Guardar</button>
    <label class="btn">Abrir<input id="loadJson" type="file" accept=".json" hidden></label>
+   <button class="btn primary" id="downloadPlanH">⬇️ PDF horizontal</button>
+   <button class="btn primary" id="downloadPlanV">⬇️ PDF vertical</button>
    <button class="btn red" id="showLive">🔴 En vivo</button>
   </div>
  </div>
@@ -857,7 +859,8 @@ function buildReport(){
 const PDF_COLORS={
  ink:[23,26,30],ink2:[37,42,48],orange:[244,119,33],white:[255,255,255],
  grey:[187,193,199],green:[77,166,109],yellow:[242,201,76],darkorange:[237,139,47],red:[217,83,79],
- line:[216,221,226],muted:[112,121,131],paper:[243,245,247],blue:[46,95,168]
+ line:[216,221,226],muted:[112,121,131],paper:[243,245,247],blue:[46,95,168],
+ headerGrey:[225,229,232],startBg:[255,224,199],minBg:[240,242,244]
 };
 function pdfMinuteColor(m){const C=PDF_COLORS;return m>32?C.red:m>=28?C.darkorange:m>=22?C.yellow:m>=15?C.green:C.grey}
 function pdfQuarterColor(m){const C=PDF_COLORS;return m<=2?C.red:m<=4?C.darkorange:m<=6?C.yellow:C.green}
@@ -1014,6 +1017,295 @@ async function downloadReportPdf(){
   toast('No se ha podido generar el PDF: '+err.message);
  }finally{
   btn.disabled=false;btn.textContent=prevText;
+ }
+}
+
+function drawPlanQuarterBlock(pdf,x,y,w,qi,q,C,rowH){
+ rowH=rowH||7;
+ const minColW=9,posColW=(w-minColW)/5,hdrH=4.6;
+ pdf.setFillColor(...C.orange);pdf.rect(x,y,w,5.4,'F');
+ pdf.setTextColor(...C.white);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
+ pdf.text('Q'+(qi+1),x+2.2,y+3.8);
+ pdf.setFont('helvetica','normal');pdf.setFontSize(6);
+ pdf.text('QUINTETO INICIAL + CAMBIOS',x+w-2,y+3.8,{align:'right'});
+ let ry=y+5.4;
+
+ function cellBorder(cx,cy,cw,ch){pdf.setDrawColor(...C.line);pdf.setLineWidth(.2);pdf.rect(cx,cy,cw,ch,'S')}
+ function cell(cx,cy,cw,ch,id){
+  cellBorder(cx,cy,cw,ch);
+  if(!id)return;
+  const p=gp(id);
+  pdf.setFont('helvetica','bold');pdf.setFontSize(ch>=6.8?7:6.4);pdf.setTextColor(...C.blue);
+  pdf.text('#'+id,cx+cw/2,cy+ch*0.46,{align:'center'});
+  pdf.setFont('helvetica','normal');pdf.setFontSize(ch>=6.8?4.6:4.1);pdf.setTextColor(...C.muted);
+  pdf.text(pdfTruncate(p?p.name:'',13),cx+cw/2,cy+ch*0.9,{align:'center'});
+ }
+
+ // cabecera MIN / P1..P5
+ pdf.setFillColor(...C.headerGrey);pdf.rect(x,ry,w,hdrH,'F');
+ pdf.setTextColor(...C.ink);pdf.setFont('helvetica','bold');pdf.setFontSize(6);
+ cellBorder(x,ry,minColW,hdrH);
+ pdf.text('MIN',x+minColW/2,ry+3,{align:'center'});
+ for(let c=0;c<5;c++){
+  const cx=x+minColW+c*posColW;
+  cellBorder(cx,ry,posColW,hdrH);
+  pdf.text('P'+(c+1),cx+posColW/2,ry+3,{align:'center'});
+ }
+ ry+=hdrH;
+
+ // fila INICIO
+ pdf.setFillColor(...C.startBg);pdf.rect(x,ry,minColW,rowH,'F');
+ cellBorder(x,ry,minColW,rowH);
+ pdf.setFont('helvetica','bold');pdf.setFontSize(5.6);pdf.setTextColor(...C.ink);
+ pdf.text('INICIO',x+minColW/2,ry+rowH/2+1,{align:'center'});
+ q.start.forEach((id,c)=>{cell(x+minColW+c*posColW,ry,posColW,rowH,id)});
+ ry+=rowH;
+
+ // filas de minutos
+ for(let min=9;min>=0;min--){
+  const r=9-min;
+  pdf.setFillColor(...C.minBg);pdf.rect(x,ry,minColW,rowH,'F');
+  cellBorder(x,ry,minColW,rowH);
+  pdf.setFont('helvetica','bold');pdf.setFontSize(6.5);pdf.setTextColor(...C.ink);
+  pdf.text(String(min),x+minColW/2,ry+rowH/2+1,{align:'center'});
+  for(let c=0;c<5;c++)cell(x+minColW+c*posColW,ry,posColW,rowH,q.changes[r][c]);
+  ry+=rowH;
+ }
+ pdf.setDrawColor(...C.line);pdf.setLineWidth(.3);pdf.rect(x,y+5.4,w,ry-(y+5.4),'S');
+ return ry;
+}
+
+async function downloadPlanPdfLandscape(){
+ const btn=$('downloadPlanH'),prevText=btn?btn.textContent:'';
+ if(btn){btn.disabled=true;btn.textContent='Generando PDF…'}
+ await new Promise(r=>setTimeout(r,30));
+ try{
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const C=PDF_COLORS,PAGE_W=297,PAGE_H=210,M=10,CW=PAGE_W-2*M;
+  const {snaps:planSnaps,errors}=plan(s.quarters);
+  const mCalc=metrics(planSnaps);
+  const players=valid();
+
+  const hdrH=17;
+  pdf.setFillColor(...C.ink);pdf.rect(0,0,PAGE_W,hdrH,'F');
+  pdf.setFillColor(...C.orange);pdf.rect(0,hdrH,PAGE_W,1.3,'F');
+  pdf.setTextColor(...C.orange);pdf.setFont('helvetica','bold');pdf.setFontSize(13);
+  pdf.text('VALENCIA BASKET',M,8.5);
+  pdf.setTextColor(...C.white);pdf.setFont('helvetica','normal');pdf.setFontSize(7.8);
+  pdf.text('Plan de rotaciones y cambios',M,13.8);
+  pdf.setFontSize(7.4);
+  const metaParts=[];
+  if(s.rival)metaParts.push('Rival: '+s.rival);
+  if(s.fecha)metaParts.push('Fecha: '+s.fecha);
+  if(s.competicion)metaParts.push(s.competicion);
+  if(s.notes)metaParts.push('Jornada: '+s.notes);
+  pdf.text(metaParts.join('   ·   ')||' ',PAGE_W-M,8.5,{align:'right'});
+
+  let y=hdrH+4.5;
+  if(errors.length){
+   pdf.setTextColor(...C.red);pdf.setFont('helvetica','bold');pdf.setFontSize(6.4);
+   const errLines=pdf.splitTextToSize('⚠ Revisar plan: '+errors.join(' · '),CW);
+   pdf.text(errLines,M,y);
+   y+=errLines.length*2.9+2;
+  }
+
+  const topY=y;
+  const sideW=63,mainGap=7,leftW=CW-sideW-mainGap;
+  const qGap=5,colW=(leftW-qGap)/2,col1X=M,col2X=M+colW+qGap;
+  const rowH=6.5;
+
+  const bottomY1=drawPlanQuarterBlock(pdf,col1X,topY,colW,0,s.quarters[0],C,rowH);
+  const bottomY2=drawPlanQuarterBlock(pdf,col2X,topY,colW,1,s.quarters[1],C,rowH);
+  const row2Y=Math.max(bottomY1,bottomY2)+3.5;
+  drawPlanQuarterBlock(pdf,col1X,row2Y,colW,2,s.quarters[2],C,rowH);
+  drawPlanQuarterBlock(pdf,col2X,row2Y,colW,3,s.quarters[3],C,rowH);
+
+  // ===== REPARTO CALCULADO (columna lateral, misma página) =====
+  const sideX=M+leftW+mainGap;
+  pdf.setFillColor(...C.orange);pdf.rect(sideX,topY,sideW,6.6,'F');
+  pdf.setTextColor(...C.white);pdf.setFont('helvetica','bold');pdf.setFontSize(7.4);
+  pdf.text('REPARTO CALCULADO',sideX+2,topY+4.4);
+  let sy=topY+6.6;
+  pdf.setFillColor(...C.ink2);pdf.rect(sideX,sy,sideW,3.8,'F');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(6.2);pdf.setTextColor(...C.white);
+  pdf.text(errors.length?'REVISAR':'PLAN OK',sideX+sideW/2,sy+2.6,{align:'center'});
+  sy+=3.8+1.4;
+
+  const sortedCalc=[...players].sort((a,b)=>(mCalc.tot[b.number]||0)-(mCalc.tot[a.number]||0));
+  const n=sortedCalc.length||1;
+  const availH=(PAGE_H-M)-sy-16.5;
+  const cardGap=0.8;
+  const cardH=Math.min(10.2,(availH-((n-1)*cardGap))/n);
+  sortedCalc.forEach((p,i)=>{
+   const cy=sy+i*(cardH+cardGap);
+   const mins=mCalc.tot[p.number]||0,t=Number(p.target)||0,maxr=mCalc.max[p.number]||0,d=mins-t;
+   const barColor=pdfMinuteColor(mins);
+   pdf.setFillColor(...C.paper);pdf.rect(sideX,cy,sideW,cardH,'F');
+   pdf.setFillColor(...barColor);pdf.rect(sideX,cy,1.4,cardH,'F');
+   pdf.setDrawColor(...C.line);pdf.setLineWidth(.15);pdf.rect(sideX,cy,sideW,cardH,'S');
+   pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...C.ink);
+   pdf.text('#'+p.number+' '+pdfTruncate(p.name,17),sideX+3,cy+3.1,{maxWidth:sideW-17});
+   pdf.setFont('helvetica','bold');pdf.setFontSize(8.4);pdf.setTextColor(...C.ink);
+   pdf.text(mins+"'",sideX+sideW-2,cy+3.5,{align:'right'});
+   pdf.setFont('helvetica','normal');pdf.setFontSize(4.4);pdf.setTextColor(...C.muted);
+   pdf.text('Marcado '+t+"' · Máx "+maxr+"'",sideX+3,cy+5.4);
+   const diffTxt=!t?'Sin minutaje marcado':d===0?'Cuadra con lo marcado':(d>0?'+':'')+d+"' vs marcado";
+   const diffCol=!t?C.ink:d===0?C.green:d>0?C.blue:C.red;
+   pdf.setFont('helvetica','bold');pdf.setFontSize(4.4);pdf.setTextColor(...diffCol);
+   pdf.text(diffTxt,sideX+3,cy+7.2);
+   const tl=mCalc.tl[p.number]||[];
+   const segW=(sideW-6)/40;
+   tl.forEach((on,idx)=>{
+    pdf.setFillColor(...(on?C.ink2:C.line));
+    pdf.rect(sideX+3+idx*segW,cy+cardH-2,Math.max(segW-0.15,0.08),1.3,'F');
+   });
+  });
+  sy+=sortedCalc.length*(cardH+cardGap)+2.5;
+
+  const teamTotal=Object.values(mCalc.tot).reduce((a,b)=>a+b,0);
+  const maxRunAll=Math.max(0,...Object.values(mCalc.max));
+  const nQuintets=quintets(planSnaps).length;
+  const metGap=1.4,metW=(sideW-2*metGap)/3,metH=9;
+  [['MIN TOT.',teamTotal],['MÁX SEG.',maxRunAll+"'"],['QUINT.',nQuintets]].forEach((met,i)=>{
+   const mx=sideX+i*(metW+metGap);
+   pdf.setFillColor(...C.paper);pdf.roundedRect(mx,sy,metW,metH,1,1,'F');
+   pdf.setFont('helvetica','bold');pdf.setFontSize(7.6);pdf.setTextColor(...C.ink);
+   pdf.text(String(met[1]),mx+metW/2,sy+4.7,{align:'center'});
+   pdf.setFont('helvetica','normal');pdf.setFontSize(3.7);pdf.setTextColor(...C.muted);
+   pdf.text(met[0],mx+metW/2,sy+7.3,{align:'center'});
+  });
+  sy+=metH+3.3;
+
+  const legendItems=[["<15'",C.grey],["15–22'",C.green],["22–28'",C.yellow],["28–32'",C.darkorange],[">32'",C.red]];
+  let lx=sideX,ly=sy;
+  pdf.setFont('helvetica','normal');pdf.setFontSize(4.4);
+  legendItems.forEach(([label,rgb])=>{
+   const wLabel=pdf.getTextWidth(label);
+   if(lx+2.2+wLabel>sideX+sideW){lx=sideX;ly+=3.2}
+   pdf.setFillColor(...rgb);pdf.circle(lx+0.75,ly-0.7,0.75,'F');
+   pdf.setTextColor(...C.muted);
+   pdf.text(label,lx+2.1,ly);
+   lx+=2.1+wLabel+2.8;
+  });
+
+  pdf.save(`Plan_Cambios_VBC_${(s.rival||'partido').replace(/\s+/g,'_')}_Horizontal.pdf`);
+ }catch(err){
+  toast('No se ha podido generar el PDF: '+err.message);
+ }finally{
+  if(btn){btn.disabled=false;btn.textContent=prevText}
+ }
+}
+
+async function downloadPlanPdfPortrait(){
+ const btn=$('downloadPlanV'),prevText=btn?btn.textContent:'';
+ if(btn){btn.disabled=true;btn.textContent='Generando PDF…'}
+ await new Promise(r=>setTimeout(r,30));
+ try{
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const C=PDF_COLORS,PAGE_W=210,PAGE_H=297,M=11,CW=PAGE_W-2*M;
+  const {snaps:planSnaps,errors}=plan(s.quarters);
+  const mCalc=metrics(planSnaps);
+  const players=valid();
+
+  pdf.setFillColor(...C.ink);pdf.rect(0,0,PAGE_W,28,'F');
+  pdf.setFillColor(...C.orange);pdf.rect(0,28,PAGE_W,1.6,'F');
+  pdf.setTextColor(...C.orange);pdf.setFont('helvetica','bold');pdf.setFontSize(15);
+  pdf.text('VALENCIA BASKET',M,12);
+  pdf.setTextColor(...C.white);pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);
+  pdf.text('Plan de rotaciones y cambios',M,19);
+  pdf.setFontSize(8.5);
+  const metaParts=[];
+  if(s.rival)metaParts.push('Rival: '+s.rival);
+  if(s.fecha)metaParts.push('Fecha: '+s.fecha);
+  if(s.competicion)metaParts.push(s.competicion);
+  if(s.notes)metaParts.push('Jornada: '+s.notes);
+  pdf.text(metaParts.join('   ·   ')||' ',PAGE_W-M,12,{align:'right'});
+
+  let y=34;
+  if(errors.length){
+   pdf.setTextColor(...C.red);pdf.setFont('helvetica','bold');pdf.setFontSize(7.2);
+   const errLines=pdf.splitTextToSize('⚠ Revisar plan: '+errors.join(' · '),CW);
+   pdf.text(errLines,M,y);
+   y+=errLines.length*3.2+2;
+  }
+
+  const topY=y,qGap=5,colW=(CW-qGap)/2,col1X=M,col2X=M+colW+qGap,rowH=5.8;
+  const bottomY1=drawPlanQuarterBlock(pdf,col1X,topY,colW,0,s.quarters[0],C,rowH);
+  const bottomY2=drawPlanQuarterBlock(pdf,col2X,topY,colW,1,s.quarters[1],C,rowH);
+  const row2Y=Math.max(bottomY1,bottomY2)+3.5;
+  const bottomY3=drawPlanQuarterBlock(pdf,col1X,row2Y,colW,2,s.quarters[2],C,rowH);
+  const bottomY4=drawPlanQuarterBlock(pdf,col2X,row2Y,colW,3,s.quarters[3],C,rowH);
+  y=Math.max(bottomY3,bottomY4)+5;
+
+  // ===== REPARTO CALCULADO (banda inferior, 3 columnas de tarjetas) =====
+  pdf.setFillColor(...C.orange);pdf.rect(M,y,CW,6.6,'F');
+  pdf.setTextColor(...C.white);pdf.setFont('helvetica','bold');pdf.setFontSize(8);
+  pdf.text('REPARTO CALCULADO',M+2,y+4.4);
+  pdf.setFontSize(7.4);
+  pdf.text(errors.length?'REVISAR':'PLAN OK',M+CW-2,y+4.4,{align:'right'});
+  y+=6.6;
+
+  const sortedCalc=[...players].sort((a,b)=>(mCalc.tot[b.number]||0)-(mCalc.tot[a.number]||0));
+  const nCols=3,cardGap=4,cardW=(CW-(nCols-1)*cardGap)/nCols,cardRowGap=2.2,cardH=13.5;
+  sortedCalc.forEach((p,i)=>{
+   const colidx=i%nCols,row=Math.floor(i/nCols);
+   const cx=M+colidx*(cardW+cardGap),cy=y+row*(cardH+cardRowGap);
+   const mins=mCalc.tot[p.number]||0,t=Number(p.target)||0,maxr=mCalc.max[p.number]||0,d=mins-t;
+   const barColor=pdfMinuteColor(mins);
+   pdf.setFillColor(...C.paper);pdf.rect(cx,cy,cardW,cardH,'F');
+   pdf.setFillColor(...barColor);pdf.rect(cx,cy,1.6,cardH,'F');
+   pdf.setDrawColor(...C.line);pdf.setLineWidth(.15);pdf.rect(cx,cy,cardW,cardH,'S');
+   pdf.setFont('helvetica','bold');pdf.setFontSize(6.6);pdf.setTextColor(...C.ink);
+   pdf.text('#'+p.number+' '+pdfTruncate(p.name,17),cx+3.6,cy+4.1,{maxWidth:cardW-18});
+   pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.setTextColor(...C.ink);
+   pdf.text(mins+"'",cx+cardW-2.6,cy+4.6,{align:'right'});
+   pdf.setFont('helvetica','normal');pdf.setFontSize(4.8);pdf.setTextColor(...C.muted);
+   pdf.text('Marcado '+t+"' · Máx "+maxr+"'",cx+3.6,cy+7.2);
+   const diffTxt=!t?'Sin minutaje marcado':d===0?'Cuadra con lo marcado':(d>0?'+':'')+d+"' vs marcado";
+   const diffCol=!t?C.ink:d===0?C.green:d>0?C.blue:C.red;
+   pdf.setFont('helvetica','bold');pdf.setFontSize(4.8);pdf.setTextColor(...diffCol);
+   pdf.text(diffTxt,cx+3.6,cy+9.6);
+   const tl=mCalc.tl[p.number]||[];
+   const segW=(cardW-7)/40;
+   tl.forEach((on,idx)=>{
+    pdf.setFillColor(...(on?C.ink2:C.line));
+    pdf.rect(cx+3.6+idx*segW,cy+cardH-2.6,Math.max(segW-0.15,0.08),1.5,'F');
+   });
+  });
+  const cardRows=Math.ceil(sortedCalc.length/nCols);
+  y=y+cardRows*(cardH+cardRowGap)+4;
+
+  const teamTotal=Object.values(mCalc.tot).reduce((a,b)=>a+b,0);
+  const maxRunAll=Math.max(0,...Object.values(mCalc.max));
+  const nQuintets=quintets(planSnaps).length;
+  const metGap=6,metW=(CW-2*metGap)/3,metH=13;
+  [['MIN TOTALES',teamTotal],['MÁX SEGUIDO',maxRunAll+"'"],['QUINTETOS',nQuintets]].forEach((met,i)=>{
+   const mx=M+i*(metW+metGap);
+   pdf.setFillColor(...C.paper);pdf.roundedRect(mx,y,metW,metH,1.5,1.5,'F');
+   pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.setTextColor(...C.ink);
+   pdf.text(String(met[1]),mx+metW/2,y+7.4,{align:'center'});
+   pdf.setFont('helvetica','normal');pdf.setFontSize(5.6);pdf.setTextColor(...C.muted);
+   pdf.text(met[0],mx+metW/2,y+11,{align:'center'});
+  });
+  y+=metH+6;
+
+  const legendItems=[["<15'",C.grey],["15–22'",C.green],["22–28'",C.yellow],["28–32'",C.darkorange],[">32'",C.red]];
+  let lx=M;
+  pdf.setFont('helvetica','normal');pdf.setFontSize(6.6);
+  legendItems.forEach(([label,rgb])=>{
+   pdf.setFillColor(...rgb);pdf.circle(lx+1,y-1,1,'F');
+   pdf.setTextColor(...C.muted);
+   pdf.text(label,lx+3.2,y);
+   lx+=pdf.getTextWidth(label)+11;
+  });
+
+  pdf.save(`Plan_Cambios_VBC_${(s.rival||'partido').replace(/\s+/g,'_')}_Vertical.pdf`);
+ }catch(err){
+  toast('No se ha podido generar el PDF: '+err.message);
+ }finally{
+  if(btn){btn.disabled=false;btn.textContent=prevText}
  }
 }
 /* ===== PARTIDO EN VIVO ===== */
@@ -1240,6 +1532,8 @@ $('loadJson').addEventListener('change',async e=>{const f=e.target.files[0];if(!
 $('showReport').addEventListener('click',()=>{buildReport();showView('report')});
 $('backPlan').addEventListener('click',()=>{ensureLive();showView('live');renderLive()});
 $('downloadPdf').addEventListener('click', downloadReportPdf);
+$('downloadPlanH').addEventListener('click', downloadPlanPdfLandscape);
+$('downloadPlanV').addEventListener('click', downloadPlanPdfPortrait);
 
 async function afterLogin(){
  $('logoutBtn').style.display='inline-block';
