@@ -668,7 +668,8 @@ function openPicker(c){
   });
   g.appendChild(b)
  });
- $('clearChange').style.display=c.type==='change'?'inline-block':'none';
+ $('clearChange').style.display='inline-block';
+ $('clearChange').textContent=c.type==='start'?'✕ Quitar del quinteto':'✕ Borrar cambio';
  $('modal').classList.add('open')
 }
 function closePicker(){$('modal').classList.remove('open')}
@@ -1325,7 +1326,7 @@ async function downloadPlanPdfPortrait(){
 /* ===== PARTIDO EN VIVO ===== */
 function ensureLive(){
  if(!s.live)s.live={quarters:null};
- if(!s.live.quarters)s.live.quarters=JSON.parse(JSON.stringify(s.quarters));
+ if(!s.live.quarters)s.live.quarters=blankQuarters();
 }
 function liveQuarters(){ensureLive();return s.live.quarters}
 function renderLiveGrid(){
@@ -1523,9 +1524,10 @@ const debouncedSave=debounce(()=>save(),500);
 $('rival').addEventListener('input',e=>{s.rival=e.target.value;debouncedSave()});$('competicion').addEventListener('input',e=>{s.competicion=e.target.value;debouncedSave()});$('fecha').addEventListener('change',e=>{s.fecha=e.target.value;save()});$('notes').addEventListener('input',e=>{s.notes=e.target.value;debouncedSave()});
 $('closeModal').addEventListener('click',closePicker);$('modal').addEventListener('click',e=>{if(e.target.id==='modal')closePicker()});
 $('clearChange').addEventListener('click',()=>{
- if(!ctx||ctx.type!=='change')return;
+ if(!ctx)return;
  const quarters=ctx.target==='live'?liveQuarters():s.quarters;
- quarters[ctx.q].changes[ctx.r][ctx.c]='';save();closePicker();
+ if(ctx.type==='start')quarters[ctx.q].start[ctx.c]='';else quarters[ctx.q].changes[ctx.r][ctx.c]='';
+ save();closePicker();
  if(ctx.target==='live')renderLive();else render()
 });
 $('clearCombo').addEventListener('click',()=>{s.combo=[];save();renderAnalysis()});
