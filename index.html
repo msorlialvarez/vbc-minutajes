@@ -232,6 +232,12 @@ input,select{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8
 .home-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:16px 0}
 .btn.big{padding:16px 26px;font-size:14px;border-radius:12px;min-width:180px}
 .rp.rp3{grid-template-columns:48px 1fr 64px}
+.savestat{font-size:12px;font-weight:850;padding:5px 9px;border-radius:999px;background:#ffffff22;color:#fff;white-space:nowrap}
+.savestat.ok{background:#e3f4e8;color:#1f6b3a}.savestat.dirty{background:#fff1d6;color:#8a5a00}.savestat.err{background:#f8dcdc;color:#9a2f2f}.savestat.pending{background:#e7eaed;color:#444}
+.head .headactions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.newcomp{display:none;margin-top:6px;gap:6px;align-items:center;flex-wrap:wrap}
+.newcomp input{flex:1 1 120px;min-width:0}
+.newcomp .btn{min-height:38px;padding:6px 10px}
 .plist{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:12px}
 .pcard{display:flex;align-items:center;gap:12px;border:2px solid #e3e6e9;border-radius:13px;padding:10px 12px;background:#fff;transition:border-color .15s}
 .pcard:focus-within{border-color:var(--o)}
@@ -309,7 +315,7 @@ input,select{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8
   <div class="actions"><button type="button" class="btn dark" id="plantillaHome">← Volver al inicio</button></div>
  </div>
  <div class="box">
-  <div class="head"><h2>JUGADORAS DE LA PLANTILLA</h2><button type="button" class="btn primary" id="plantillaAddPlayer">+ AÑADIR JUGADORA</button></div>
+  <div class="head"><h2>JUGADORAS DE LA PLANTILLA</h2><div class="headactions"><span class="savestat" id="squadStatus"></span><button type="button" class="btn primary" id="plantillaAddPlayer">+ AÑADIR JUGADORA</button><button type="button" class="btn" id="plantillaSave" style="background:#4da66d;color:#fff">💾 GUARDAR</button></div></div>
   <div class="plist" id="plantillaRoster"></div>
  </div>
  <div class="tip"><strong>Nota:</strong> la plantilla y la convocatoria están vinculadas. Toda jugadora de la plantilla aparece siempre en la convocatoria de cualquier partido (nuevo o ya creado), con 0' y convocada por defecto. Si quitas a alguien de la plantilla, sus datos ya jugados en partidos anteriores se mantienen (no se borran), simplemente dejará de añadirse como novedad.</div>
@@ -318,7 +324,7 @@ input,select{width:100%;min-height:38px;border:1px solid #ccd2d8;border-radius:8
 <section class="planner-view" id="planner" style="display:none">
  <div class="top">
   <div><label>Rival</label><input id="rival" placeholder="Rival"></div>
-  <div><label>Competición</label><select id="competicion"><option value="">Competición…</option><option>Liga</option><option>Copa</option><option>Torneo</option><option>Amistoso</option></select></div>
+  <div><label>Competición</label><select id="competicion"><option value="">Competición…</option><option value="__new__">＋ Nueva competición…</option></select><div class="newcomp" id="competicionNew"><input id="competicionNewInput" placeholder="Nombre de la competición" autocomplete="off" maxlength="60"><button type="button" class="btn primary" id="competicionNewOk">Añadir</button><button type="button" class="btn" id="competicionNewCancel">✕</button></div></div>
   <div><label>Fecha</label><input id="fecha" type="date"></div>
   <div><label>Jornada</label><input id="notes" placeholder="Jornada"></div>
   <div class="actions">
@@ -467,14 +473,28 @@ function blankSquad(){return{roster:[]}}
 function loadLocalSquadCache(){try{const x=JSON.parse(localStorage.getItem(SQUAD_KEY));return x&&x.roster?x:null}catch(e){return null}}
 function loadLocalMatchesCache(){try{const x=JSON.parse(localStorage.getItem(MATCHES_KEY));return Array.isArray(x)?x:null}catch(e){return null}}
 function cacheLocally(){try{localStorage.setItem(SQUAD_KEY,JSON.stringify(SQUAD));localStorage.setItem(MATCHES_KEY,JSON.stringify(MATCHES))}catch(e){}}
+function setSquadStatus(state,msg){const el=$('squadStatus');if(!el)return;el.className='savestat '+state;el.textContent=msg}
+function hhmm(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function pushSquad(){
+ lastSquadPushAt=Date.now();
+ setSquadStatus('pending','Guardando…');
+ return Promise.resolve(sb.from('squad').upsert({id:'main',data:SQUAD,updated_at:new Date().toISOString()})).then(({error})=>{
+  lastSquadPushAt=Date.now();
+  if(error){toast('No se ha podido guardar la plantilla en el servidor: '+error.message);setSquadStatus('err','⚠ Sin guardar en el servidor');return false}
+  setSquadStatus('ok','✓ Guardado '+hhmm());return true
+ }).catch(e=>{toast('No se ha podido guardar la plantilla: '+(e&&e.message||'sin conexión'));setSquadStatus('err','⚠ Sin guardar en el servidor');return false})
+}
 function saveSquad(){
  lastSquadPushAt=Date.now();
  cacheLocally();
+ setSquadStatus('dirty','● Cambios sin guardar');
  clearTimeout(window._squadPushTimer);
- window._squadPushTimer=setTimeout(()=>{
-  lastSquadPushAt=Date.now();
-  sb.from('squad').upsert({id:'main',data:SQUAD,updated_at:new Date().toISOString()}).then(({error})=>{if(error)toast('No se ha podido guardar la plantilla en el servidor: '+error.message)})
- },500)
+ window._squadPushTimer=setTimeout(pushSquad,800)
+}
+function saveSquadNow(){
+ clearTimeout(window._squadPushTimer);
+ cacheLocally();
+ return pushSquad()
 }
 
 let SQUAD=blankSquad();
@@ -572,10 +592,29 @@ function save(){
  }
 }
 function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function competicionList(){
+ const m=new Map();
+ (MATCHES||[]).forEach(x=>{const c=String(x&&x.competicion||'').trim();if(c&&!m.has(c.toLowerCase()))m.set(c.toLowerCase(),c)});
+ return [...m.values()].sort((a,b)=>a.localeCompare(b,'es'))
+}
 function setCompeticion(v){
+ v=String(v||'').trim();
  const sel=$('competicion');
- if(v&&![...sel.options].some(o=>o.value===v)){const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)}
- sel.value=v||''
+ const list=competicionList();
+ if(v&&!list.some(x=>x.toLowerCase()===v.toLowerCase()))list.push(v);
+ sel.innerHTML='';
+ const add=(val,txt)=>{const o=document.createElement('option');o.value=val;o.textContent=txt;sel.appendChild(o)};
+ add('','Competición…');list.forEach(x=>add(x,x));add('__new__','＋ Nueva competición…');
+ const hit=list.find(x=>x.toLowerCase()===v.toLowerCase());
+ sel.value=hit||'';
+ $('competicionNew').style.display='none'
+}
+function commitNewCompeticion(){
+ const v=$('competicionNewInput').value.trim().replace(/\s+/g,' ');
+ if(!v){toast('Escribe el nombre de la competición');$('competicionNewInput').focus();return}
+ const hit=competicionList().find(x=>x.toLowerCase()===v.toLowerCase());
+ s.competicion=hit||v;
+ setCompeticion(s.competicion);save()
 }
 function byNumber(a,b){return String(a.number).localeCompare(String(b.number),undefined,{numeric:true})}
 function valid(){return s.roster.filter(p=>p.active!==false&&p.number.trim()&&p.name.trim()).sort(byNumber)}
@@ -1482,6 +1521,7 @@ function renderPlantilla(){
   if(v&&SQUAD.roster.some((p,j)=>j!==i&&p.number===v)){toast('Ese dorsal ya está utilizado');x.value=old;return}
   SQUAD.roster[i].number=v;saveSquad();renderPlantilla()
  }));
+ h.querySelectorAll('[data-pnum]').forEach(x=>x.addEventListener('input',()=>setSquadStatus('dirty','● Cambios sin guardar')));
  h.querySelectorAll('[data-pname]').forEach(x=>x.addEventListener('input',()=>{SQUAD.roster[+x.dataset.pname].name=x.value;saveSquad()}));
  h.querySelectorAll('[data-premove]').forEach(x=>x.addEventListener('click',()=>{
   clearTimeout(x._t);
@@ -1494,12 +1534,33 @@ function renderPlantilla(){
   x._t=setTimeout(()=>{x.dataset.confirm='';x.textContent='✕';x.title='Eliminar de la plantilla';x.classList.remove('confirming')},3000)
  }));
 }
+function commitPlantillaInputs(){
+ const h=$('plantillaRoster');let ok=true;
+ h.querySelectorAll('[data-pnum]').forEach(x=>{
+  const i=+x.dataset.pnum,p=SQUAD.roster[i];if(!p)return;
+  const v=x.value.trim();
+  if(v!==p.number){
+   if(v&&SQUAD.roster.some((q,j)=>j!==i&&q.number===v)){toast('Ese dorsal ya está utilizado: '+v);x.value=p.number;ok=false;return}
+   p.number=v
+  }
+ });
+ h.querySelectorAll('[data-pname]').forEach(x=>{const p=SQUAD.roster[+x.dataset.pname];if(p&&p.name!==x.value)p.name=x.value});
+ return ok
+}
+$('plantillaSave').addEventListener('click',async()=>{
+ const ok=commitPlantillaInputs();
+ const incomplete=SQUAD.roster.filter(p=>!String(p.number).trim()||!String(p.name).trim()).length;
+ const saved=await saveSquadNow();
+ renderPlantilla();
+ if(saved&&ok){toast(incomplete?`Plantilla guardada (${SQUAD.roster.length} jugadoras). Ojo: ${incomplete} sin dorsal o sin nombre.`:`✓ Plantilla guardada (${SQUAD.roster.length} jugadoras)`)}
+
+});
 $('plantillaAddPlayer').addEventListener('click',()=>{
  let next=1;const used=new Set(SQUAD.roster.map(p=>String(p.number)));while(used.has(String(next)))next++;
  SQUAD.roster.push({number:String(next),name:'Nueva jugadora'});saveSquad();renderPlantilla()
 });
-$('goPlantilla').addEventListener('click',()=>{showView('plantilla');renderPlantilla()});
-$('plantillaHome').addEventListener('click',()=>{showView('home');renderHistory()});
+$('goPlantilla').addEventListener('click',()=>{showView('plantilla');renderPlantilla();if(!$('squadStatus').textContent)setSquadStatus('ok','✓ Plantilla al día')});
+$('plantillaHome').addEventListener('click',()=>{commitPlantillaInputs();if($('squadStatus')&&$('squadStatus').classList.contains('dirty'))saveSquadNow();showView('home');renderHistory()});
 $('plannerHome').addEventListener('click',()=>{showView('home');renderHistory()});
 $('reportHome').addEventListener('click',()=>{showView('home');renderHistory()});
 /* ===== FIN PLANTILLA ===== */
@@ -1586,7 +1647,14 @@ function render(){
 }
 function debounce(fn,ms){let t;return(...args)=>{clearTimeout(t);t=setTimeout(()=>fn(...args),ms)}}
 const debouncedSave=debounce(()=>save(),500);
-$('rival').addEventListener('input',e=>{s.rival=e.target.value;debouncedSave()});$('competicion').addEventListener('change',e=>{s.competicion=e.target.value;save()});$('fecha').addEventListener('change',e=>{s.fecha=e.target.value;save()});$('notes').addEventListener('input',e=>{s.notes=e.target.value;debouncedSave()});
+$('rival').addEventListener('input',e=>{s.rival=e.target.value;debouncedSave()});$('competicion').addEventListener('change',e=>{
+ if(e.target.value==='__new__'){const b=$('competicionNew');b.style.display='flex';$('competicionNewInput').value='';$('competicionNewInput').focus();return}
+ $('competicionNew').style.display='none';s.competicion=e.target.value;save()
+});
+$('competicionNewOk').addEventListener('click',commitNewCompeticion);
+$('competicionNewInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitNewCompeticion()}});
+$('competicionNewCancel').addEventListener('click',()=>setCompeticion(s.competicion||''));
+$('fecha').addEventListener('change',e=>{s.fecha=e.target.value;save()});$('notes').addEventListener('input',e=>{s.notes=e.target.value;debouncedSave()});
 $('closeModal').addEventListener('click',closePicker);$('modal').addEventListener('click',e=>{if(e.target.id==='modal')closePicker()});
 $('clearChange').addEventListener('click',()=>{
  if(!ctx)return;
